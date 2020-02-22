@@ -1905,10 +1905,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(loss)
                 return loss
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+            start_loss = focal_loss(
+                outputs["start_probs"], features["start_positions"])
+            end_loss = focal_loss(
+                outputs["end_probs"], features["end_positions"])
 
             total_loss = (start_loss + end_loss) * 0.5
 
