@@ -1465,95 +1465,95 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     sequence_output = output
     return_dict["sequence_output"] = output
 
-    with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
-
-        def fusion_layer(x, y):
-            z = tf.concat([x, y, x * y, x - y], axis=2)
-            gated = tf.layers.dense(z, 1,
-                                    activation=tf.nn.sigmoid,
-                                    use_bias=True,
-                                    kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-            fusion = tf.layers.dense(z, albert_config.hidden_size,
-                                     activation=tf.nn.tanh,
-                                     use_bias=True,
-                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-            return gated * fusion + (1 - gated) * x
-
-        def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
-                         initializer=modeling.create_initializer(albert_config.initializer_range)):
-            from layers import CoupledInputForgetGateLSTMCell
-            with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
-                lstm_cell = {}
-                for direction in ["forward", "backward"]:
-                    with tf.variable_scope(direction):
-                        lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
-                            lstm_dim,
-                            use_peepholes=True,
-                            initializer=initializer,
-                            state_is_tuple=True
-                        )
-                outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
-                    lstm_cell["forward"],
-                    lstm_cell["backward"],
-                    lstm_inputs,
-                    dtype=tf.float32,
-                    sequence_length=lengths
-                )
-            return tf.concat(outputs, axis=2), final_states
-
-        encoding_dim = 256
-        question_mask = tf.cast(
-            tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-        passage_mask = tf.cast(segment_ids, tf.float32)
-
-        encoded_question = output * tf.expand_dims(question_mask, 2)
-        encoded_passage = output * tf.expand_dims(passage_mask, 2)
-
-        s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
-        alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
-
-        q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
-
-        beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
-
-        p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
-
-        fused_passage = fusion_layer(encoded_passage, q_aware_p)
-
-        fused_question = fusion_layer(encoded_question, p_aware_q)
-
-        # self_w = tf.get_variable(name="self_w",
-        #                          shape=[albert_config.hidden_size, albert_config.hidden_size],
-        #                          initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                          trainable=True)
-        # self_b = tf.get_variable(name="self_b",
-        #                          shape=[max_seq_length],
-        #                          initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                          trainable=True)
-        # self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
-        # intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
-        # self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, fused_passage)
-        #
-        # intermediate_p = fusion_layer(fused_passage, self_aware_passage)
-        # contextual_p = tf.einsum(" bLe, bL -> bLe ",
-        #                          biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
-        #                          passage_mask)
-        # intermediate_q = tf.einsum(" ble, bl -> ble ",
-        #                            biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
-        #                            question_mask)
-        # gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
-        # contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
-        # project_w = tf.get_variable(name="project_w",
-        #                             shape=[encoding_dim * 2],
-        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                             trainable=True)
-        # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
-        project_w = tf.get_variable(name="project_w",
-                                    shape=[albert_config.hidden_size, max_seq_length],
-                                    initializer=modeling.create_initializer(albert_config.initializer_range),
-                                    trainable=True)
-
-        output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
+    # with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         z = tf.concat([x, y, x * y, x - y], axis=2)
+    #         gated = tf.layers.dense(z, 1,
+    #                                 activation=tf.nn.sigmoid,
+    #                                 use_bias=True,
+    #                                 kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                  activation=tf.nn.tanh,
+    #                                  use_bias=True,
+    #                                  kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
+    #                      initializer=modeling.create_initializer(albert_config.initializer_range)):
+    #         from layers import CoupledInputForgetGateLSTMCell
+    #         with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
+    #             lstm_cell = {}
+    #             for direction in ["forward", "backward"]:
+    #                 with tf.variable_scope(direction):
+    #                     lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
+    #                         lstm_dim,
+    #                         use_peepholes=True,
+    #                         initializer=initializer,
+    #                         state_is_tuple=True
+    #                     )
+    #             outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
+    #                 lstm_cell["forward"],
+    #                 lstm_cell["backward"],
+    #                 lstm_inputs,
+    #                 dtype=tf.float32,
+    #                 sequence_length=lengths
+    #             )
+    #         return tf.concat(outputs, axis=2), final_states
+    #
+    #     encoding_dim = 256
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #
+    #     s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
+    #     alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
+    #
+    #     q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
+    #
+    #     beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
+    #
+    #     p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+    #
+    #     fused_passage = fusion_layer(encoded_passage, q_aware_p)
+    #
+    #     fused_question = fusion_layer(encoded_question, p_aware_q)
+    #
+    #     # self_w = tf.get_variable(name="self_w",
+    #     #                          shape=[albert_config.hidden_size, albert_config.hidden_size],
+    #     #                          initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                          trainable=True)
+    #     # self_b = tf.get_variable(name="self_b",
+    #     #                          shape=[max_seq_length],
+    #     #                          initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                          trainable=True)
+    #     # self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
+    #     # intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+    #     # self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, fused_passage)
+    #     #
+    #     # intermediate_p = fusion_layer(fused_passage, self_aware_passage)
+    #     # contextual_p = tf.einsum(" bLe, bL -> bLe ",
+    #     #                          biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
+    #     #                          passage_mask)
+    #     # intermediate_q = tf.einsum(" ble, bl -> ble ",
+    #     #                            biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
+    #     #                            question_mask)
+    #     # gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
+    #     # contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+    #     # project_w = tf.get_variable(name="project_w",
+    #     #                             shape=[encoding_dim * 2],
+    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                             trainable=True)
+    #     # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
+    #     project_w = tf.get_variable(name="project_w",
+    #                                 shape=[albert_config.hidden_size, max_seq_length],
+    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                                 trainable=True)
+    #
+    #     output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
@@ -1907,16 +1907,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
-            start_loss = focal_loss(
-                outputs["start_probs"], features["start_positions"])
-            end_loss = focal_loss(
-                outputs["end_probs"], features["end_positions"])
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
+            # start_loss = focal_loss(
+            #     outputs["start_probs"], features["start_positions"])
+            # end_loss = focal_loss(
+            #     outputs["end_probs"], features["end_positions"])
 
             total_loss = (start_loss + end_loss) * 0.5
+
+            from rl.rl_loss import rl_loss
+            loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
+                              features["end_positions"])
+
+            total_loss += loss_rl * 0.5
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
