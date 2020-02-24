@@ -3,10 +3,10 @@ from rl.utils import mask_to_start
 
 
 def simple_tf_f1_score(tensors):
-    prediction_start = tensors[0]
-    prediction_end = tensors[1]
-    ground_truth_start = tensors[2]
-    ground_truth_end = tensors[3]
+    prediction_start = tf.cast(tensors[0], dtype=tf.float32)
+    prediction_end = tf.cast(tensors[1], dtype=tf.float32)
+    ground_truth_start = tf.cast(tensors[2], dtype=tf.float32)
+    ground_truth_end = tf.cast(tensors[3], dtype=tf.float32)
 
     min_end = tf.reduce_min([prediction_end, ground_truth_end])
     max_start = tf.reduce_max([prediction_start, ground_truth_start])
