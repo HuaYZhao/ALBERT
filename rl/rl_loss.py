@@ -27,10 +27,11 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, simple_nu
     reward = [[]] * 4
     for t in range(simple_num):
         f1_score = tf.map_fn(
-            simple_tf_f1_score, (guess_start[t], guess_end[t], answer_start, answer_end), dtype=tf.float32)
+            simple_tf_f1_score, (guess_start[:, t], guess_end[:, t], answer_start, answer_end),
+            dtype=tf.float32)  # [bs,]
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
-    return tf.stack(reward)
+    return tf.stack(reward)  # [bs, 4]
 
 
 def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, simple_num):
@@ -73,6 +74,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=4):
     print("guess_start_shape", guess_start.shape)
 
     r = reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num)
+    print("reward_shape:", r.shape)
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num)
     loss = tf.reduce_mean(-r)
 
