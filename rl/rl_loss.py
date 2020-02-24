@@ -68,17 +68,17 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=4):
     # guess_end_greedy = tf.argmax(mask_to_start(
     #     end_logits, guess_start_greedy), axis=1)
     guess_end_greedy = tf.argmax(end_logits, axis=1)
-    print("guess_start_greedy_shape", guess_start_greedy.shape)
+    # print("guess_start_greedy_shape", guess_start_greedy.shape)
     baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
                                               answer_start, answer_end), dtype=tf.float32)
-    print("baseline_shape", baseline.shape)
+    # print("baseline_shape", baseline.shape)
 
     guess_start = tf.multinomial(start_logits, sample_num)
     guess_end = tf.multinomial(end_logits, sample_num)
-    print("guess_start_shape", guess_start.shape)
+    # print("guess_start_shape", guess_start.shape)
 
-    r = reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num)
-    print("reward_shape:", r.shape)
+    r = reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num)  # [4,4]
+    # print("reward_shape:", r.shape)
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num)
     loss = tf.reduce_mean(-r)
 
