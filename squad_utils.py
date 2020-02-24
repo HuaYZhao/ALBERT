@@ -1763,6 +1763,26 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             batch_size = modeling.get_shape_list(input_ids)[0]
             seq_length = modeling.get_shape_list(input_ids)[1]
 
+            def compute_loss(log_probs, positions):
+                one_hot_positions = tf.one_hot(
+                    positions, depth=seq_length, dtype=tf.float32)
+
+                loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+                loss = tf.reduce_mean(loss)
+                return loss
+
+            def compute_sn_loss(log_probs, positions):
+                def exp_mask(val, mask):
+                    mask = tf.cast(mask, tf.float32)
+                    return val * mask + (1 - mask) * -1e30
+
+                masked_log_probs = exp_mask(log_probs, input_mask)
+                group_norms = tf.reduce_logsumexp(masked_log_probs, axis=1)
+                answer_mask = tf.one_hot(positions, depth=seq_length)
+                log_score = tf.reduce_logsumexp(masked_log_probs - 1e30 * (1 - answer_mask), axis=1)
+                loss = tf.reduce_mean(-(log_score - group_norms))
+                return loss
+
             def compute_crf_loss(sequence_output, start_positions, end_positions):
                 """
                 compute crf loss
@@ -1858,19 +1878,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = loss_ce
             # # total_loss = (start_loss + end_loss) * 0.5
-            #
-            # cls_logits = outputs["cls_logits"]
-            # is_impossible = tf.reshape(features["is_impossible"], [-1])
-            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            # regression_loss = tf.reduce_mean(regression_loss)
 
             # crf_loss = compute_crf_loss(outputs["sequence_output"], features["start_positions"],
             #                             features["end_positions"])
-
-            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # comparable to start_loss and end_loss
-            # total_loss += regression_loss * 0.5  # + crf_loss * 0.5
 
             # decoder_tvars = [v for v in tvars if v.name.startswith('decoder_loop')]
             # other_tvars = list(set(tvars).difference(decoder_tvars))
@@ -1897,14 +1907,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            def compute_loss(log_probs, positions):
-                one_hot_positions = tf.one_hot(
-                    positions, depth=seq_length, dtype=tf.float32)
-
-                loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-                loss = tf.reduce_mean(loss)
-                return loss
-
             # start_loss = compute_loss(
             #     outputs["start_log_probs"], features["start_positions"])
             # end_loss = compute_loss(
@@ -1925,8 +1927,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
-            train_op = optimization.create_optimizer(
+            # train_op = optimization.create_optimizer(
+            #     total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            train_op1 = optimization.create_bert_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            train_op2 = optimization.create_other_optimizer(
+                total_loss, learning_rate * 100, num_train_steps, use_tpu)
+            train_op = tf.group(train_op1, train_op2)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
