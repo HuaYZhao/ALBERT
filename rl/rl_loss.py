@@ -73,7 +73,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=4):
     print("guess_start_shape", guess_start.shape)
 
     r = reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num)
-    surr_loss = surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, simple_num)
+    surr_loss = surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num)
     loss = tf.reduce_mean(-r)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
