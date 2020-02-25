@@ -1941,7 +1941,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 for _i in range(project_layers_num - 1):
                     now_layer = all_encoder_layers[-_i - 2]
 
-                    with tf.variable_scope("start_logits"):
+                    with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
                         start_logits = tf.layers.dense(
                             now_layer,
                             1,
@@ -1951,7 +1951,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
 
                     # logit of the end position
-                    with tf.variable_scope("end_logits"):
+                    with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
                         if is_training:
                             # during training, compute the end logits based on the
                             # ground truth of the start position
