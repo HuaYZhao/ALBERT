@@ -24,11 +24,13 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, project_l
     """
     Reinforcement learning reward (i.e. F1 score) from sampling a trajectory of guesses across each decoder timestep
     """
-    reward = [[]] * project_layers_num * simple_num
+    reward = [[]] * simple_num
 
-    print("answer_start_shape:",answer_start.shape)
+    print("answer_start_shape:", answer_start.shape)
     answer_start = tf.tile(answer_start, [project_layers_num])
     answer_end = tf.tile(answer_end, [project_layers_num])
+    baseline = tf.tile(baseline, [project_layers_num])
+
     for t in range(simple_num):
         f1_score = tf.map_fn(
             simple_tf_f1_score, (guess_start[:, t], guess_end[:, t], answer_start, answer_end),
