@@ -1979,14 +1979,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     logits[project_layers_num - 2 - _i] = tf.stack([start_logits_masked, end_logits_masked], axis=-1)
                 return logits
 
-            from rl.rl_loss import rl_loss
-            loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
-                              features["end_positions"], sample_num=4)
+            # from rl.rl_loss import rl_loss
+            # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
+            #                   features["end_positions"], sample_num=4)
 
-            # from rl.rl_loss2 import rl_loss
-            # logits = project_encoder_layers(outputs, features, project_layers_num=1)
-            # loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
-            #                   project_layers_num=1, sample_num=1)
+            from rl.rl_loss2 import rl_loss
+            logits = project_encoder_layers(outputs, features, project_layers_num=1)
+            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
+                              project_layers_num=1, sample_num=4)
 
             # total_loss += loss_rl * 0.5
             theta_ce = tf.get_variable('theta_ce', (), tf.float32)
