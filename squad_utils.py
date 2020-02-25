@@ -1985,8 +1985,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             from rl.rl_loss2 import rl_loss
             logits = project_encoder_layers(outputs, features, project_layers_num=4)
-            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"], project_layers_num=4,
-                              sample_num=1)
+            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
+                              project_layers_num=4, sample_num=2)
 
             # total_loss += loss_rl * 0.5
             theta_ce = tf.get_variable('theta_ce', (), tf.float32)
