@@ -46,7 +46,7 @@ def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample
     """
     bs = logits.read(0).shape.as_list()[0]
 
-    logits = logits.concat()
+    logits = tf.concat(logits)
     guess_start = tf.reshape(guess_start, [-1])  # (bs * project_layers_num * simple_num ,)
     guess_end = tf.reshape(guess_end, [-1])
     r = tf.reshape(r, [-1])
