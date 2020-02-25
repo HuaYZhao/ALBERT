@@ -31,7 +31,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, simple_nu
             dtype=tf.float32)  # [bs,]
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
-    return tf.stack(reward)  # [4, bs]
+    return tf.stack(reward, axis=-1)  # [bs, 4]
 
 
 def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num):
@@ -52,6 +52,7 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     end_loss = r * \
                tf.nn.sparse_softmax_cross_entropy_with_logits(
                    logits=end_logits, labels=guess_end)
+    print(start_loss.shape)
     start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
     end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
     loss = tf.reduce_mean(tf.reduce_mean(
@@ -65,8 +66,8 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=4):
     """
 
     guess_start_greedy = tf.argmax(start_logits, axis=1)
-    end_logits = tf.argmax(mask_to_start(
-        end_logits, guess_start_greedy), axis=1)
+    # end_logits = tf.argmax(mask_to_start(
+    #     end_logits, guess_start_greedy), axis=1)
     guess_end_greedy = tf.argmax(end_logits, axis=1)
     # print("guess_start_greedy_shape", guess_start_greedy.shape)
     baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
