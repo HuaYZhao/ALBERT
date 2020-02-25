@@ -1939,7 +1939,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     return logits
 
                 for _i in range(project_layers_num - 1):
-                    now_layer = all_encoder_layers[-_i - 2]
+                    now_layer = tf.transpose(all_encoder_layers[-_i - 2], [1, 0, 2])
 
                     with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
                         start_logits = tf.layers.dense(
