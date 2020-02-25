@@ -1448,7 +1448,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
+    (_, output, all_encoder_layers) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1654,6 +1654,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["end_logits"] = end_logits_masked
         return_dict["end_probs"] = tf.nn.softmax(end_logits_masked, -1)
         return_dict["end_log_probs"] = end_log_probs
+        return_dict["p_mask"] = p_mask
+        return_dict["all_encoder_layers"] = all_encoder_layers
     else:
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
@@ -1919,9 +1921,74 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss = (start_loss + end_loss) * 0.5
             loss_ce = (start_loss + end_loss) * 0.5
 
-            from rl.rl_loss import rl_loss
-            loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
-                              features["end_positions"], sample_num=2)
+            def project_encoder_layers(outputs, features, project_layers_num=4):
+                logits = tf.TensorArray(tf.float32, size=project_layers_num, clear_after_read=False)
+
+                all_encoder_layers = outputs["all_encoder_layers"]
+                p_mask = outputs["p_mask"]
+                last_layer_start_logits = outputs["start_logits"]
+                last_layer_end_logits = outputs["end_logits"]
+
+                if project_layers_num < 1:
+                    raise
+                else:
+                    logits.write(project_layers_num - 1,
+                                 tf.concat([last_layer_start_logits, last_layer_end_logits], axis=-1))
+
+                if project_layers_num == 1:
+                    return logits
+
+                for _i in range(project_layers_num - 1):
+                    now_layer = all_encoder_layers[-_i - 2]
+
+                    with tf.variable_scope("start_logits"):
+                        start_logits = tf.layers.dense(
+                            now_layer,
+                            1,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range))
+                        start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
+                        start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
+
+                    # logit of the end position
+                    with tf.variable_scope("end_logits"):
+                        if is_training:
+                            # during training, compute the end logits based on the
+                            # ground truth of the start position
+                            start_positions = tf.reshape(features["start_positions"], [-1])
+                            start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
+                                                     dtype=tf.float32)
+                            start_features = tf.einsum("lbh,bl->bh", now_layer, start_index)
+                            start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
+                            end_logits = tf.layers.dense(
+                                tf.concat([now_layer, start_features], axis=-1),
+                                albert_config.hidden_size,
+                                kernel_initializer=modeling.create_initializer(
+                                    albert_config.initializer_range),
+                                activation=tf.tanh,
+                                name="dense_0")
+                            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
+
+                            end_logits = tf.layers.dense(
+                                end_logits,
+                                1,
+                                kernel_initializer=modeling.create_initializer(
+                                    albert_config.initializer_range),
+                                name="dense_1")
+                            end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
+                            end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
+                    logits.write(project_layers_num - 2 - _i,
+                                 tf.concat([start_logits_masked, end_logits_masked], axis=-1))
+                return logits
+
+            # from rl.rl_loss import rl_loss
+            # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
+            #                   features["end_positions"], sample_num=4)
+
+            from rl.rl_loss2 import rl_loss
+            logits = project_encoder_layers(outputs, features, project_layers_num=4)
+            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"], project_layers_num=4,
+                              sample_num=1)
 
             # total_loss += loss_rl * 0.5
             theta_ce = tf.get_variable('theta_ce', (), tf.float32)
