@@ -53,10 +53,10 @@ def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample
         r_i = r[:, _sample_i]
         start_loss = r_i * \
                      tf.nn.sparse_softmax_cross_entropy_with_logits(
-                         logits=logits[:, :, 0], labels=guess_start)
+                         logits=logits[:, :, 0], labels=guess_start_i)
         end_loss = r_i * \
                    tf.nn.sparse_softmax_cross_entropy_with_logits(
-                       logits=logits[:, :, 1], labels=guess_end)
+                       logits=logits[:, :, 1], labels=guess_end_i)
         loss += tf.reduce_mean(start_loss + end_loss)
 
     # guess_start = tf.reshape(guess_start, [-1])  # (bs * project_layers_num * simple_num ,)
