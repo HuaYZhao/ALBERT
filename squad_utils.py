@@ -1933,7 +1933,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     raise
                 else:
                     logits.write(project_layers_num - 1,
-                                 tf.concat([last_layer_start_logits, last_layer_end_logits], axis=-1))
+                                 tf.stack([last_layer_start_logits, last_layer_end_logits], axis=-1))
 
                 if project_layers_num == 1:
                     return logits
@@ -1978,7 +1978,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                             end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
                             end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
                     logits.write(project_layers_num - 2 - _i,
-                                 tf.concat([start_logits_masked, end_logits_masked], axis=-1))
+                                 tf.stack([start_logits_masked, end_logits_masked], axis=-1))
                 return logits
 
             # from rl.rl_loss import rl_loss
