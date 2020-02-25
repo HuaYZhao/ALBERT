@@ -44,13 +44,12 @@ def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample
     """
     The surrogate loss to be used for policy gradient updates
     """
+    bs = logits.read(0).shape.as_list()[0]
 
     logits = logits.concat()
     guess_start = tf.reshape(guess_start, [-1])  # (bs * project_layers_num * simple_num ,)
     guess_end = tf.reshape(guess_end, [-1])
     r = tf.reshape(r, [-1])
-
-    bs = logits.read(0).shape.as_list()[0]
 
     start_logits = tf.concat(
         [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 0], bs * project_layers_num)], axis=0)
