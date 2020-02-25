@@ -24,7 +24,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, simple_nu
     """
     Reinforcement learning reward (i.e. F1 score) from sampling a trajectory of guesses across each decoder timestep
     """
-    reward = [[]] * 4
+    reward = [[]] * simple_num
     for t in range(simple_num):
         f1_score = tf.map_fn(
             simple_tf_f1_score, (guess_start[:, t], guess_end[:, t], answer_start, answer_end),
