@@ -44,9 +44,9 @@ def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample
     """
     The surrogate loss to be used for policy gradient updates
     """
-    bs = logits.read(0).shape.as_list()[0]
+    bs = logits[0].shape.as_list()[0]
 
-    logits = tf.concat(logits)
+    logits = tf.concat(logits, axis=0)
     guess_start = tf.reshape(guess_start, [-1])  # (bs * project_layers_num * simple_num ,)
     guess_end = tf.reshape(guess_end, [-1])
     r = tf.reshape(r, [-1])
@@ -73,7 +73,7 @@ def rl_loss(logits, answer_start, answer_end, project_layers_num=4, sample_num=1
     """
     Reinforcement learning loss
     """
-    final_logits = logits.read(project_layers_num - 1)
+    final_logits = logits[project_layers_num - 1]
     final_start_logits = final_logits[:, :, 0]
     final_end_logits = final_logits[:, :, 1]
     guess_start_greedy = tf.argmax(final_start_logits, axis=1)
@@ -87,7 +87,7 @@ def rl_loss(logits, answer_start, answer_end, project_layers_num=4, sample_num=1
     guess_end = []
 
     for t in range(project_layers_num):
-        logits_t = logits.read(t)
+        logits_t = logits[t]
         start_logits = logits_t[:, :, 0]
         end_logits = logits_t[:, :, 1]
         guess_start.append(tf.multinomial(start_logits, sample_num))

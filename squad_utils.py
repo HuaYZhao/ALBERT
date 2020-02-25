@@ -1922,7 +1922,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             loss_ce = (start_loss + end_loss) * 0.5
 
             def project_encoder_layers(outputs, features, project_layers_num=4):
-                logits = tf.TensorArray(tf.float32, size=project_layers_num, clear_after_read=False)
+                logits = [[]] * project_layers_num
 
                 all_encoder_layers = outputs["all_encoder_layers"]
                 p_mask = outputs["p_mask"]
@@ -1932,8 +1932,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 if project_layers_num < 1:
                     raise
                 else:
-                    logits.write(project_layers_num - 1,
-                                 tf.stack([last_layer_start_logits, last_layer_end_logits], axis=-1))
+                    logits[project_layers_num - 1] = tf.stack([last_layer_start_logits, last_layer_end_logits], axis=-1)
 
                 if project_layers_num == 1:
                     return logits
@@ -1977,8 +1976,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                 name="dense_1")
                             end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
                             end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
-                    logits.write(project_layers_num - 2 - _i,
-                                 tf.stack([start_logits_masked, end_logits_masked], axis=-1))
+                    logits[project_layers_num - 2 - _i] = tf.stack([start_logits_masked, end_logits_masked], axis=-1)
                 return logits
 
             # from rl.rl_loss import rl_loss
