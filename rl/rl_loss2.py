@@ -25,6 +25,9 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, project_l
     Reinforcement learning reward (i.e. F1 score) from sampling a trajectory of guesses across each decoder timestep
     """
     reward = [[]] * project_layers_num * simple_num
+
+    answer_start = tf.tile(answer_start, [project_layers_num, 1])
+    answer_end = tf.tile(answer_end, [project_layers_num, 1])
     for t in range(simple_num):
         f1_score = tf.map_fn(
             simple_tf_f1_score, (guess_start[:, t], guess_end[:, t], answer_start, answer_end),
@@ -87,9 +90,9 @@ def rl_loss(logits, answer_start, answer_end, project_layers_num=4, sample_num=1
         end_logits = logits_t[:, :, 1]
         guess_start.append(tf.multinomial(start_logits, sample_num))
         guess_end.append(tf.multinomial(end_logits, sample_num))
-    guess_start = tf.stack(guess_start)
-    guess_end = tf.stack(guess_end)
-
+    guess_start = tf.concat(guess_start, axis=0)
+    guess_end = tf.concat(guess_end, axis=0)
+    print("guess_start_shape", guess_start.shape)
     r = reward(guess_start, guess_end, answer_start, answer_end, baseline, project_layers_num,
                sample_num)  # [bs*project_layers,4]
     # print("reward_shape:", r.shape)
