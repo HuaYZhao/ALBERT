@@ -1987,8 +1987,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 p_mask = outputs["p_mask"]
                 bsz = tf.shape(output)[0]
 
-                raw_perturb = tf.gradients(raw_loss, tf.trainable_variables())[0]
-                print(raw_perturb.shape)
+                raw_perturb = tf.gradients(raw_loss, output)[0]
+                print("raw_perturb_shape", raw_perturb.shape)
                 perturb = adv_eps * tf.stop_gradient(
                     tf.nn.l2_normalize(raw_perturb * tf.expand_dims(mask, axis=-1), dim=[0, 1, 2]))
                 print(perturb.shape)
