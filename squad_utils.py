@@ -1573,8 +1573,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
 
-        encoded_question = output + (1. - tf.expand_dims(question_mask, 2)) * -10000.
-        encoded_passage = output + (1. - tf.expand_dims(passage_mask, 2)) * -10000.
+        encoded_question = output * tf.expand_dims(question_mask, 2)
+        encoded_passage = output * tf.expand_dims(passage_mask, 2)
 
         from modeling import dot_product_attention
 

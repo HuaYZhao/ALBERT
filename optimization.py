@@ -96,7 +96,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
 
     tvars = tf.trainable_variables()
     grads = tf.gradients(loss, tvars)
-    # grads = [g * 100 if not v.name.startswith("bert") else g for v, g in zip(tvars, grads)]
+    grads = [g * 100 if v.name.startswith("co-attention") else g for v, g in zip(tvars, grads)]
 
     # This is how the model was pre-trained.
     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
