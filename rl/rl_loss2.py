@@ -49,6 +49,9 @@ def simple_tf_f1_score(tensors):
                      lambda: overlap / (ground_truth_end - ground_truth_start + 1))
 
     f1 = (2 * precision * recall) / (precision + recall)
+
+    f1 = tf.cond(tf.greater(prediction_start, prediction_end), lambda: 0., lambda: f1)
+    f1 = tf.cond(tf.equal(ground_truth_end, 0) & ~tf.equal(prediction_end, 0), lambda: 0., lambda: f1)
     return f1
 
 
