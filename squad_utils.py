@@ -1557,38 +1557,38 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #
     #     output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
-    with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
-
-        def fusion_layer(x, y):
-            z = tf.concat([x, y, x * y, x - y], axis=2)
-            gated = tf.layers.dense(z, 1,
-                                    activation=tf.nn.sigmoid,
-                                    use_bias=True,
-                                    kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-            fusion = tf.layers.dense(z, albert_config.hidden_size,
-                                     activation=tf.nn.tanh,
-                                     use_bias=True,
-                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-            return gated * fusion + (1 - gated) * x
-
-        question_mask = tf.cast(
-            tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-        passage_mask = tf.cast(segment_ids, tf.float32)
-
-        encoded_question = output * tf.expand_dims(question_mask, 2)
-        encoded_passage = output * tf.expand_dims(passage_mask, 2)
-
-        from modeling import dot_product_attention
-
-        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-
-        project_w = tf.get_variable(name="project_w",
-                                    shape=[albert_config.hidden_size, max_seq_length],
-                                    initializer=modeling.create_initializer(albert_config.initializer_range),
-                                    trainable=True)
-
-        output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
+    # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         z = tf.concat([x, y, x * y, x - y], axis=2)
+    #         gated = tf.layers.dense(z, 1,
+    #                                 activation=tf.nn.sigmoid,
+    #                                 use_bias=True,
+    #                                 kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                  activation=tf.nn.tanh,
+    #                                  use_bias=True,
+    #                                  kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #
+    #     from modeling import dot_product_attention
+    #
+    #     q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #
+    #     project_w = tf.get_variable(name="project_w",
+    #                                 shape=[albert_config.hidden_size, max_seq_length],
+    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                                 trainable=True)
+    #
+    #     output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
 
     output = tf.transpose(output, [1, 0, 2])
 
@@ -1945,16 +1945,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
             # start_loss = focal_loss(
             #     outputs["start_probs"], features["start_positions"])
             # end_loss = focal_loss(
             #     outputs["end_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            # total_loss = (start_loss + end_loss) * 0.5
 
             # loss_ce = (start_loss + end_loss) * 0.5
 
@@ -2164,18 +2164,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
             #                   features["end_positions"], sample_num=4)
 
-            # from rl.rl_loss2 import rl_loss, cross_entropy_loss
-            # logits = project_encoder_layers(outputs, features, project_layers_num=1)
-            # loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
-            #                              project_layers_num=1, sample_num=4)
-            # loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
-            #                   project_layers_num=1, sample_num=4)
-            #
-            # # total_loss += loss_rl * 0.5
-            # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
-            # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
-            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
-            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            from rl.rl_loss2 import rl_loss, cross_entropy_loss
+            logits = project_encoder_layers(outputs, features, project_layers_num=1)
+            loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
+                                         project_layers_num=1, sample_num=4)
+            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
+                              project_layers_num=1, sample_num=4)
+
+            # total_loss += loss_rl * 0.5
+            theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+                         loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
             cls_logits = outputs["cls_logits"]
