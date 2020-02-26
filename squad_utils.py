@@ -1909,16 +1909,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
             # start_loss = focal_loss(
             #     outputs["start_probs"], features["start_positions"])
             # end_loss = focal_loss(
             #     outputs["end_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            # total_loss = (start_loss + end_loss) * 0.5
 
             # loss_ce = (start_loss + end_loss) * 0.5
 
@@ -2136,11 +2136,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                               project_layers_num=1, sample_num=4)
 
             # total_loss += loss_rl * 0.5
-            # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
-            # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
-            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
-            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
-            total_loss = 0.5 * loss_ce + 0.5 * loss_rl
+            theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+                         loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
