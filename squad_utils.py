@@ -1556,6 +1556,19 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
     with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
+
+        def fusion_layer(x, y):
+            z = tf.concat([x, y, x * y, x - y], axis=2)
+            gated = tf.layers.dense(z, 1,
+                                    activation=tf.nn.sigmoid,
+                                    use_bias=True,
+                                    kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+            fusion = tf.layers.dense(z, albert_config.hidden_size,
+                                     activation=tf.nn.tanh,
+                                     use_bias=True,
+                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+            return gated * fusion + (1 - gated) * x
+
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
@@ -1565,16 +1578,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from modeling import dot_product_attention
 
-        q_aware_output = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
-        concat_output = tf.stack([output, q_aware_output], axis=-1)
-
-        output = tf.layers.dense(
-            concat_output,
-            1,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range))
-        output = tf.squeeze(output)
+        output = fusion_layer(q_aware_passage, p_aware_question)
 
     output = tf.transpose(output, [1, 0, 2])
 
