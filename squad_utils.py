@@ -1983,7 +1983,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def adversarial_training_loss(raw_loss, outputs, features, adv_eps=0.02):
 
                 output = outputs["sequence_output"]
-                mask = features["input_mask"]
+                mask = tf.cast(features["input_mask"], tf.float32)
                 p_mask = outputs["p_mask"]
                 bsz = tf.shape(output)[0]
 
