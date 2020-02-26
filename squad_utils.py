@@ -1580,10 +1580,15 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from modeling import dot_product_attention
 
-        output = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-        #
-        # output = fusion_layer(q_aware_passage, p_aware_question)
+        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+
+        project_w = tf.get_variable(name="project_w",
+                                    shape=[albert_config.hidden_size, max_seq_length],
+                                    initializer=modeling.create_initializer(albert_config.initializer_range),
+                                    trainable=True)
+
+        output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
 
     output = tf.transpose(output, [1, 0, 2])
 
