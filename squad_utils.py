@@ -1565,7 +1565,16 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from modeling import dot_product_attention
 
-        output = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        q_aware_output = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+
+        concat_output = tf.stack([output, q_aware_output], axis=-1)
+
+        output = tf.layers.dense(
+            concat_output,
+            1,
+            kernel_initializer=modeling.create_initializer(
+                albert_config.initializer_range))
+        output = tf.squeeze(output)
 
     output = tf.transpose(output, [1, 0, 2])
 
