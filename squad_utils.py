@@ -1994,6 +1994,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 print(perturb.shape)
                 output += perturb
 
+                output = tf.transpose(output, [1, 0, 2])
+
                 # logit of the start position
                 with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
                     start_logits = tf.layers.dense(
