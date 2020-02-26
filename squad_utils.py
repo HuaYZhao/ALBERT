@@ -1565,7 +1565,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from modeling import dot_product_attention
 
-        output = dot_product_attention(encoded_passage, encoded_question, encoded_question)
+        output = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
 
     output = tf.transpose(output, [1, 0, 2])
 
