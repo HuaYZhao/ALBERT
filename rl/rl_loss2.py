@@ -6,30 +6,29 @@ def cross_entropy_loss(logits, answer_start, answer_end, project_layers_num, sam
     """
     Cross entropy loss across all decoder timesteps
     """
-    bs = logits[0].shape.as_list()[0]
     logits = tf.concat(logits, axis=0)
 
-    start_logits = tf.concat(
-        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 0], bs * project_layers_num)], axis=0)
-    end_logits = tf.concat(
-        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 1], bs * project_layers_num)], axis=0)
+    # start_logits = tf.concat(
+    #     [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 0], bs * project_layers_num)], axis=0)
+    # end_logits = tf.concat(
+    #     [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 1], bs * project_layers_num)], axis=0)
 
     answer_start = tf.tile(answer_start, [project_layers_num])
     answer_end = tf.tile(answer_end, [project_layers_num])
 
-    answer_start = tf.concat(
-        [tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_start, bs * project_layers_num)], axis=0)
-
-    answer_end = tf.concat(
-        [tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_end, bs * project_layers_num)], axis=0)
+    # answer_start = tf.concat(
+    #     [tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_start, bs * project_layers_num)], axis=0)
+    #
+    # answer_end = tf.concat(
+    #     [tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_end, bs * project_layers_num)], axis=0)
 
     start_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=start_logits, labels=answer_start)
+        logits=logits[:, :, 0], labels=answer_start)
     end_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits=end_logits, labels=answer_end)
+        logits=logits[:, :, 1], labels=answer_end)
 
-    start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
-    end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
+    start_loss = tf.stack(tf.split(start_loss, project_layers_num), axis=1)
+    end_loss = tf.stack(tf.split(end_loss, project_layers_num), axis=1)
     loss = tf.reduce_mean(tf.reduce_mean(
         start_loss + end_loss, axis=1), axis=0)
     return loss
