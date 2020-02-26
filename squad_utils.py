@@ -1468,7 +1468,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
 
         def fusion_layer(x, y):
-            with tf.variable_scope("fusion",reuse=tf.AUTO_REUSE):
+            with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
                 z = tf.concat([x, y, x * y, x - y], axis=2)
                 gated = tf.layers.dense(z, 1,
                                         activation=tf.nn.sigmoid,
@@ -1477,7 +1477,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                 fusion = tf.layers.dense(z, albert_config.hidden_size,
                                          activation=tf.nn.tanh,
                                          use_bias=True,
-                                         kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+                                         kernel_initializer=modeling.create_initializer(
+                                             albert_config.initializer_range))
             return gated * fusion + (1 - gated) * x
 
         def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
@@ -1549,12 +1550,12 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                             initializer=modeling.create_initializer(albert_config.initializer_range),
         #                             trainable=True)
         # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
-        project_w = tf.get_variable(name="project_w",
-                                    shape=[albert_config.hidden_size, max_seq_length],
-                                    initializer=modeling.create_initializer(albert_config.initializer_range),
-                                    trainable=True)
-
-        output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
+        # project_w = tf.get_variable(name="project_w",
+        #                             shape=[albert_config.hidden_size, max_seq_length],
+        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+        #                             trainable=True)
+        #
+        # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
