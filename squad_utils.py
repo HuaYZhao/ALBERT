@@ -1995,7 +1995,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 output += perturb
 
                 # logit of the start position
-                with tf.variable_scope("start_logits"):
+                with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
                     start_logits = tf.layers.dense(
                         output,
                         1,
@@ -2006,7 +2006,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
                 # logit of the end position
-                with tf.variable_scope("end_logits"):
+                with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
                     if is_training:
                         # during training, compute the end logits based on the
                         # ground truth of the start position
@@ -2075,7 +2075,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                             [-1, start_n_top * end_n_top])
 
                 # an additional layer to predict answerability
-                with tf.variable_scope("answer_class"):
+                with tf.variable_scope("answer_class", reuse=tf.AUTO_REUSE):
                     # get the representation of CLS
                     cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                            max_seq_length,
