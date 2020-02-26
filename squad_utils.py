@@ -1909,16 +1909,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
             # start_loss = focal_loss(
             #     outputs["start_probs"], features["start_positions"])
             # end_loss = focal_loss(
             #     outputs["end_probs"], features["end_positions"])
 
-            # total_loss = (start_loss + end_loss) * 0.5
+            total_loss = (start_loss + end_loss) * 0.5
+
             # loss_ce = (start_loss + end_loss) * 0.5
 
             def project_encoder_layers(outputs, features, project_layers_num=4):
@@ -1979,23 +1980,165 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     logits[project_layers_num - 2 - _i] = tf.stack([start_logits_masked, end_logits_masked], axis=-1)
                 return logits
 
+            def adversarial_training_loss(raw_loss, outputs, features, adv_eps=0.02):
+
+                output = outputs["sequence_output"]
+                mask = features["input_mask"]
+                p_mask = outputs["p_mask"]
+                bsz = tf.shape(output)[0]
+
+                raw_perturb = tf.gradients(raw_loss, tf.trainable_variables())[0]
+                print(raw_perturb.shape)
+                perturb = adv_eps * tf.stop_gradient(
+                    tf.nn.l2_normalize(raw_perturb * tf.expand_dims(mask, axis=-1), dim=[0, 1, 2]))
+                print(perturb.shape)
+                output += perturb
+
+                # logit of the start position
+                with tf.variable_scope("start_logits"):
+                    start_logits = tf.layers.dense(
+                        output,
+                        1,
+                        kernel_initializer=modeling.create_initializer(
+                            albert_config.initializer_range))
+                    start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
+                    start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
+                    start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
+
+                # logit of the end position
+                with tf.variable_scope("end_logits"):
+                    if is_training:
+                        # during training, compute the end logits based on the
+                        # ground truth of the start position
+                        start_positions = tf.reshape(features["start_positions"], [-1])
+                        start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
+                                                 dtype=tf.float32)
+                        start_features = tf.einsum("lbh,bl->bh", output, start_index)
+                        start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
+                        end_logits = tf.layers.dense(
+                            tf.concat([output, start_features], axis=-1),
+                            albert_config.hidden_size,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range),
+                            activation=tf.tanh,
+                            name="dense_0")
+                        end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
+
+                        end_logits = tf.layers.dense(
+                            end_logits,
+                            1,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range),
+                            name="dense_1")
+                        end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
+                        end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
+                        end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
+                    else:
+                        # during inference, compute the end logits based on beam search
+
+                        start_top_log_probs, start_top_index = tf.nn.top_k(
+                            start_log_probs, k=start_n_top)
+                        start_index = tf.one_hot(start_top_index,
+                                                 depth=max_seq_length, axis=-1, dtype=tf.float32)
+                        start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
+                        end_input = tf.tile(output[:, :, None],
+                                            [1, 1, start_n_top, 1])
+                        start_features = tf.tile(start_features[None],
+                                                 [max_seq_length, 1, 1, 1])
+                        end_input = tf.concat([end_input, start_features], axis=-1)
+                        end_logits = tf.layers.dense(
+                            end_input,
+                            albert_config.hidden_size,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range),
+                            activation=tf.tanh,
+                            name="dense_0")
+                        end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
+                        end_logits = tf.layers.dense(
+                            end_logits,
+                            1,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range),
+                            name="dense_1")
+                        end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
+                        end_logits = tf.transpose(end_logits, [1, 2, 0])
+                        end_logits_masked = end_logits * (
+                                1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
+                        end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
+                        end_top_log_probs, end_top_index = tf.nn.top_k(
+                            end_log_probs, k=end_n_top)
+                        end_top_log_probs = tf.reshape(
+                            end_top_log_probs,
+                            [-1, start_n_top * end_n_top])
+                        end_top_index = tf.reshape(
+                            end_top_index,
+                            [-1, start_n_top * end_n_top])
+
+                # an additional layer to predict answerability
+                with tf.variable_scope("answer_class"):
+                    # get the representation of CLS
+                    cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
+                                           max_seq_length,
+                                           axis=-1, dtype=tf.float32)
+                    cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
+
+                    # get the representation of START
+                    start_p = tf.nn.softmax(start_logits_masked, axis=-1,
+                                            name="softmax_start")
+                    start_feature = tf.einsum("lbh,bl->bh", output, start_p)
+
+                    # note(zhiliny): no dependency on end_feature so that we can obtain
+                    # one single `cls_logits` for each sample
+                    ans_feature = tf.concat([start_feature, cls_feature], -1)
+                    ans_feature = tf.layers.dense(
+                        ans_feature,
+                        albert_config.hidden_size,
+                        activation=tf.tanh,
+                        kernel_initializer=modeling.create_initializer(
+                            albert_config.initializer_range),
+                        name="dense_0")
+                    ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
+                                                    training=is_training)
+                    cls_logits = tf.layers.dense(
+                        ans_feature,
+                        1,
+                        kernel_initializer=modeling.create_initializer(
+                            albert_config.initializer_range),
+                        name="dense_1",
+                        use_bias=False)
+                    cls_logits = tf.squeeze(cls_logits, -1)
+
+                start_loss = compute_loss(
+                    start_log_probs, features["start_positions"])
+                end_loss = compute_loss(
+                    end_log_probs, features["end_positions"])
+
+                is_impossible = tf.reshape(features["is_impossible"], [-1])
+                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+                regression_loss = tf.reduce_mean(regression_loss)
+
+                adv_loss = (start_loss + end_loss + regression_loss) * 0.5
+
+                return adv_loss
+
             # from rl.rl_loss import rl_loss
             # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
             #                   features["end_positions"], sample_num=4)
 
-            from rl.rl_loss2 import rl_loss, cross_entropy_loss
-            logits = project_encoder_layers(outputs, features, project_layers_num=4)
-            loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
-                                         project_layers_num=4, sample_num=4)
-            loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
-                              project_layers_num=4, sample_num=4)
-
-            # total_loss += loss_rl * 0.5
-            # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
-            # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
-            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
-            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
-            total_loss = 0.5 * loss_ce + 0.5 * loss_rl
+            # from rl.rl_loss2 import rl_loss, cross_entropy_loss
+            # logits = project_encoder_layers(outputs, features, project_layers_num=1)
+            # loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
+            #                              project_layers_num=1, sample_num=4)
+            # loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
+            #                   project_layers_num=1, sample_num=4)
+            #
+            # # total_loss += loss_rl * 0.5
+            # # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            # # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            # # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+            # #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -2006,6 +2149,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
+
+            total_loss = adversarial_training_loss(total_loss, outputs, features, adv_eps=0.02)
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
             # train_op1 = optimization.create_bert_optimizer(
