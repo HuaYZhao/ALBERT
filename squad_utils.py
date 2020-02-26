@@ -1945,10 +1945,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
             # start_loss = focal_loss(
             #     outputs["start_probs"], features["start_positions"])
             # end_loss = focal_loss(
@@ -1956,7 +1956,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # total_loss = (start_loss + end_loss) * 0.5
 
-            # loss_ce = (start_loss + end_loss) * 0.5
+            loss_ce = (start_loss + end_loss) * 0.5
 
             def project_encoder_layers(outputs, features, project_layers_num=4):
                 logits = [[]] * project_layers_num
@@ -2166,8 +2166,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
             logits = project_encoder_layers(outputs, features, project_layers_num=1)
-            loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
-                                         project_layers_num=1, sample_num=4)
+            # loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
+            #                              project_layers_num=1, sample_num=4)
             loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
                               project_layers_num=1, sample_num=4)
 
