@@ -2,6 +2,39 @@ import tensorflow as tf
 from rl.utils import mask_to_start
 
 
+def cross_entropy_loss(logits, answer_start, answer_end, project_layers_num, sample_num):
+    """
+    Cross entropy loss across all decoder timesteps
+    """
+    bs = logits[0].shape.as_list()[0]
+    logits = tf.concat(logits, axis=0)
+
+    start_logits = tf.concat(
+        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 0], bs * project_layers_num)], axis=0)
+    end_logits = tf.concat(
+        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(logits[:, :, 1], bs * project_layers_num)], axis=0)
+
+    answer_start = tf.tile(answer_start, [project_layers_num])
+    answer_end = tf.tile(answer_end, [project_layers_num])
+
+    answer_start = tf.concat(
+        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(answer_start, bs * project_layers_num)], axis=0)
+
+    answer_end = tf.concat(
+        [tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(answer_end, bs * project_layers_num)], axis=0)
+
+    start_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        logits=start_logits, labels=answer_start)
+    end_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        logits=end_logits, labels=answer_end)
+
+    start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
+    end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
+    loss = tf.reduce_mean(tf.reduce_mean(
+        start_loss + end_loss, axis=1), axis=0)
+    return loss
+
+
 def simple_tf_f1_score(tensors):
     prediction_start = tf.cast(tensors[0], dtype=tf.float32)
     prediction_end = tf.cast(tensors[1], dtype=tf.float32)
@@ -40,27 +73,6 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, project_l
     return tf.stack(reward, axis=-1)  # [bs * project_layers_num, sample]
 
 
-# def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample_num):
-#     """
-#     The surrogate loss to be used for policy gradient updates
-#     """
-#
-#     logits = tf.concat(logits, axis=0) # [16, ...]
-#     loss = 0.
-#
-#     for _sample_i in range(sample_num):
-#         guess_start_i = guess_start[:, _sample_i]
-#         guess_end_i = guess_end[:, _sample_i]
-#         r_i = r[:, _sample_i]
-#         start_loss = r_i * \
-#                      tf.nn.sparse_softmax_cross_entropy_with_logits(
-#                          logits=logits[:, :, 0], labels=guess_start_i)
-#         end_loss = r_i * \
-#                    tf.nn.sparse_softmax_cross_entropy_with_logits(
-#                        logits=logits[:, :, 1], labels=guess_end_i)
-#         loss += tf.reduce_mean(start_loss + end_loss)
-#
-#     return loss
 def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample_num):
     """
     The surrogate loss to be used for policy gradient updates

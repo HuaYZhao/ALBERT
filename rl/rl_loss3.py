@@ -40,27 +40,6 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, project_l
     return tf.stack(reward, axis=-1)  # [bs * project_layers_num, sample]
 
 
-# def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample_num):
-#     """
-#     The surrogate loss to be used for policy gradient updates
-#     """
-#
-#     logits = tf.concat(logits, axis=0) # [16, ...]
-#     loss = 0.
-#
-#     for _sample_i in range(sample_num):
-#         guess_start_i = guess_start[:, _sample_i]
-#         guess_end_i = guess_end[:, _sample_i]
-#         r_i = r[:, _sample_i]
-#         start_loss = r_i * \
-#                      tf.nn.sparse_softmax_cross_entropy_with_logits(
-#                          logits=logits[:, :, 0], labels=guess_start_i)
-#         end_loss = r_i * \
-#                    tf.nn.sparse_softmax_cross_entropy_with_logits(
-#                        logits=logits[:, :, 1], labels=guess_end_i)
-#         loss += tf.reduce_mean(start_loss + end_loss)
-#
-#     return loss
 def surrogate_loss(logits, guess_start, guess_end, r, project_layers_num, sample_num):
     """
     The surrogate loss to be used for policy gradient updates
