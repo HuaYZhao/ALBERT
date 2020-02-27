@@ -102,7 +102,7 @@ class CoupledInputForgetGateLSTMCell(rnn_cell_impl.RNNCell):
 def casual_dilated_conv(value, filters, rate, padding, name=None):
     with ops.name_scope(name, "atrous_conv2d", [value, filters]) as name:
         value = ops.convert_to_tensor(value, name="value")
-        filters = ops.convert_n_to_tensor(filters, name="filters")
+        filters = ops.convert_to_tensor(filters, name="filters")
         if not value.get_shape()[3].is_compatible_with(filters.get_shape()[2]):
             raise ValueError("")
         if rate < 1:
