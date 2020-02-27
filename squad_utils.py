@@ -1465,6 +1465,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     sequence_output = output
     return_dict["sequence_output"] = output
     return_dict["pool_output"] = pool_output
+    return_dict["all_encoder_layers"] = all_encoder_layers
 
     # with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
     #
@@ -1693,7 +1694,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["end_probs"] = tf.nn.softmax(end_logits_masked, -1)
         return_dict["end_log_probs"] = end_log_probs
         return_dict["p_mask"] = p_mask
-        return_dict["all_encoder_layers"] = all_encoder_layers
     else:
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
@@ -2192,12 +2192,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             total_loss += regression_loss * 0.5
 
             with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
-                efv_logits = tf.layers.dense(outputs["pool_output"], 1,
-                                             # activation=tf.nn.sigmoid,
-                                             use_bias=True,
-                                             kernel_initializer=modeling.create_initializer(
-                                                 albert_config.initializer_range))
-                efv_logits = tf.squeeze(efv_logits, -1)
+                _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
+                                              use_bias=True,
+                                              kernel_initializer=modeling.create_initializer(
+                                                  albert_config.initializer_range))
+                _efv_logits = tf.squeeze(_efv_logits, -1)
+                _efv_logits = tf.layers.dense(_efv_logits, 1,
+                                              use_bias=True,
+                                              kernel_initializer=modeling.create_initializer(
+                                                  albert_config.initializer_range))
+                efv_logits = tf.squeeze(_efv_logits, -1)
                 efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(is_impossible, dtype=tf.float32),
                                                                    logits=efv_logits)
                 efv_loss = tf.reduce_mean(efv_loss)
