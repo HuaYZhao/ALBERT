@@ -1711,8 +1711,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         refine_output = IDCNN_layer(output)
 
-        encoded_question = output * tf.expand_dims(question_mask, 2)
-        encoded_passage = output * tf.expand_dims(passage_mask, 2)
+        encoded_question = refine_output * tf.expand_dims(question_mask, 2)
+        encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
 
         # s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
         # alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
