@@ -1642,11 +1642,11 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     'dilation': 1
                 },
                 {
+                    'dilation': 1
+                },
+                {
                     'dilation': 2
                 },
-                # {
-                #     'dilation': 2
-                # },
             ]
             filter_width = 3
             num_filter = 384
