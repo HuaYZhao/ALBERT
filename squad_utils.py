@@ -1718,7 +1718,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             shape=[3, albert_config.hidden_size, 384],
             initializer=modeling.create_initializer())
         refine_output = tf.nn.convolution(output,
-                                          filters=filter_weights,
+                                          filter=filter_weights,
                                           padding="SAME",
                                           dilations=[1, 1, 2])
 
