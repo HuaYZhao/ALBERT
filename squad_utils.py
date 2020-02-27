@@ -1641,15 +1641,15 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     'dilation': 1
                 },
                 {
-                    'dilation': 1
-                },
-                {
                     'dilation': 2
                 },
+                # {
+                #     'dilation': 2
+                # },
             ]
             filter_width = 3
-            num_filter = albert_config.hidden_size // 2
-            repeat_times = 4
+            num_filter = 384
+            repeat_times = 1
 
             model_inputs = tf.expand_dims(model_inputs, 1)
             with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
@@ -1717,10 +1717,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             "idcnn_filter",
             shape=[3, albert_config.hidden_size, 384],
             initializer=modeling.create_initializer())
-        refine_output = tf.nn.convolution(output,
-                                          filter=filter_weights,
-                                          padding="SAME",
-                                          dilations=[1, 1, 2])
+        refine_output = IDCNN_layer(output)
 
         encoded_question = refine_output * tf.expand_dims(question_mask, 2)
         encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
