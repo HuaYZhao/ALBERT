@@ -1631,10 +1631,85 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                 )
             return tf.concat(outputs, axis=2), final_states
 
+        def IDCNN_layer(model_inputs, name=None):
+            """
+            :param idcnn_inputs: [batch_size, num_steps, emb_size]
+            :return: [batch_size, num_steps, cnn_output_width]
+            """
+            layers = [
+                {
+                    'dilation': 1
+                },
+                {
+                    'dilation': 1
+                },
+                {
+                    'dilation': 2
+                },
+            ]
+            filter_width = 3
+            num_filter = albert_config.hidden_size // 2
+            repeat_times = 4
+
+            model_inputs = tf.expand_dims(model_inputs, 1)
+            with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
+                shape = [1, filter_width, albert_config.hidden_size,
+                         num_filter]
+                print(shape)
+                filter_weights = tf.get_variable(
+                    "idcnn_filter",
+                    shape=shape,
+                    initializer=modeling.create_initializer())
+
+                """
+                shape of input = [batch, in_height, in_width, in_channels]
+                shape of filter = [filter_height, filter_width, in_channels, out_channels]
+                """
+                layerInput = tf.nn.conv2d(model_inputs,
+                                          filter_weights,
+                                          strides=[1, 1, 1, 1],
+                                          padding="SAME",
+                                          name="init_layer")
+                finalOutFromLayers = []
+                totalWidthForLastDim = 0
+                for j in range(repeat_times):
+                    for i in range(len(layers)):
+                        dilation = layers[i]['dilation']
+                        isLast = True if i == (len(layers) - 1) else False
+                        with tf.variable_scope("atrous-conv-layer-%d" % i,
+                                               reuse=tf.AUTO_REUSE):
+                            w = tf.get_variable(
+                                "filterW",
+                                shape=[1, filter_width, num_filter, num_filter],
+                                initializer=tf.contrib.layers.xavier_initializer())
+                            b = tf.get_variable("filterB", shape=[num_filter])
+                            conv = tf.nn.atrous_conv2d(layerInput,
+                                                       w,
+                                                       rate=dilation,
+                                                       padding="SAME")
+                            conv = tf.nn.bias_add(conv, b)
+                            conv = tf.nn.relu(conv)
+                            if isLast:
+                                finalOutFromLayers.append(conv)
+                                totalWidthForLastDim += num_filter
+                            layerInput = conv
+                # 只取最后一层
+                # finalOut = tf.concat(axis=3, values=finalOutFromLayers)
+                finalOut = finalOutFromLayers[-1]
+                from modeling import dropout
+                finalOut = dropout(finalOut, albert_config.hidden_dropout_prob)
+
+                finalOut = tf.squeeze(finalOut, [1])
+                # finalOut = tf.reshape(finalOut, [-1, totalWidthForLastDim])
+                print("finalOut_shape", finalOut.shape)
+                return finalOut
+
         encoding_dim = 256
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
+
+        refine_output = IDCNN_layer(output)
 
         encoded_question = output * tf.expand_dims(question_mask, 2)
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
