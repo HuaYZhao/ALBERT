@@ -1687,6 +1687,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                                        w,
                                                        rate=dilation,
                                                        padding="SAME")
+                            # conv = tf.nn.convolution(layerInput,
+                            #                          dilations=dilation,
+                            #                          padding="SAME")
                             conv = tf.nn.bias_add(conv, b)
                             conv = tf.nn.relu(conv)
                             if isLast:
@@ -1709,7 +1712,15 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
 
-        refine_output = IDCNN_layer(output)
+        # refine_output = IDCNN_layer(output)
+        filter_weights = tf.get_variable(
+            "idcnn_filter",
+            shape=[3, albert_config.hidden_size, 384],
+            initializer=modeling.create_initializer())
+        refine_output = tf.nn.convolution(output,
+                                          filters=filter_weights,
+                                          padding="SAME",
+                                          dilations=[1, 1, 2])
 
         encoded_question = refine_output * tf.expand_dims(question_mask, 2)
         encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
@@ -1754,7 +1765,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                             trainable=True)
         # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
         project_w = tf.get_variable(name="project_w",
-                                    shape=[albert_config.hidden_size // 2, max_seq_length],
+                                    shape=[384, max_seq_length],
                                     initializer=modeling.create_initializer(albert_config.initializer_range),
                                     trainable=True)
 
