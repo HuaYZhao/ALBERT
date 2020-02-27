@@ -2196,7 +2196,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                              use_bias=True,
                                              kernel_initializer=modeling.create_initializer(
                                                  albert_config.initializer_range))
-                efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(is_impossible, logits=efv_logits)
+                efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(is_impossible, dtype=tf.float32), logits=efv_logits)
 
                 total_loss += efv_loss * 0.5
 
