@@ -2182,8 +2182,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
-            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            regression_loss = 1/2 * (cls_logits - tf.cast(is_impossible, dtype=tf.float32)) ** 2
             regression_loss = tf.reduce_mean(regression_loss)
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
