@@ -618,3 +618,16 @@ time 2
   "NoAns_f1": 85.33221194280908,
   "NoAns_total": 5945
 }
+
+2e-5 ep2 xxlargev1 bs40 rl layer1 sample4 loss weight
+{
+  "exact": 87.72003705887307,
+  "f1": 90.50377650059765,
+  "total": 11873,
+  "HasAns_exact": 84.193657219973,
+  "HasAns_f1": 89.76911916187528,
+  "HasAns_total": 5928,
+  "NoAns_exact": 91.2363330529857,
+  "NoAns_f1": 91.2363330529857,
+  "NoAns_total": 5945
+}
