@@ -2191,22 +2191,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
 
-            with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
-                _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
-                                              use_bias=True,
-                                              kernel_initializer=modeling.create_initializer(
-                                                  albert_config.initializer_range))
-                _efv_logits = tf.squeeze(_efv_logits, -1)
-                _efv_logits = tf.layers.dense(_efv_logits, 1,
-                                              use_bias=True,
-                                              kernel_initializer=modeling.create_initializer(
-                                                  albert_config.initializer_range))
-                efv_logits = tf.squeeze(_efv_logits, -1)
-                efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(is_impossible, dtype=tf.float32),
-                                                                   logits=efv_logits)
-                efv_loss = tf.reduce_mean(efv_loss)
-
-                total_loss += efv_loss * 0.5
+            # with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
+            #     _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
+            #                                   use_bias=True,
+            #                                   kernel_initializer=modeling.create_initializer(
+            #                                       albert_config.initializer_range))
+            #     _efv_logits = tf.squeeze(_efv_logits, -1)
+            #     _efv_logits = tf.layers.dense(_efv_logits, 1,
+            #                                   use_bias=True,
+            #                                   kernel_initializer=modeling.create_initializer(
+            #                                       albert_config.initializer_range))
+            #     efv_logits = tf.squeeze(_efv_logits, -1)
+            #     efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(is_impossible, dtype=tf.float32),
+            #                                                        logits=efv_logits)
+            #     efv_loss = tf.reduce_mean(efv_loss)
+            #
+            #     total_loss += efv_loss * 0.5
 
             # total_loss = adversarial_training_loss(total_loss, outputs, features, adv_eps=0.02)
             train_op = optimization.create_optimizer(
