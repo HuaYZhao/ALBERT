@@ -1956,7 +1956,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # end_loss = focal_loss(
             #     outputs["end_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            total_loss = (start_loss + end_loss)
 
             # loss_ce = (start_loss + end_loss) * 0.5
 
