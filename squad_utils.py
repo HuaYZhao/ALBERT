@@ -1639,20 +1639,18 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         encoded_question = output * tf.expand_dims(question_mask, 2)
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
 
-        s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
-        alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
-
-        q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
-
-        beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
-
-        p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+        # s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
+        # alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
+        #
+        # q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
+        #
+        # beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
+        #
+        # p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
 
         from modeling import dot_product_attention
-
-        fused_passage = dot_product_attention(q_aware_p, encoded_passage, encoded_passage, bias=None)
-
-        fused_question = dot_product_attention(p_aware_q, encoded_question, encoded_question, bias=None)
+        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
         # self_w = tf.get_variable(name="self_w",
         #                          shape=[albert_config.hidden_size, albert_config.hidden_size],
@@ -1685,7 +1683,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                     initializer=modeling.create_initializer(albert_config.initializer_range),
                                     trainable=True)
 
-        output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
+        output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
 
     output = tf.transpose(output, [1, 0, 2])
 
