@@ -1684,7 +1684,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                 shape=[1, filter_width, num_filter, num_filter],
                                 initializer=tf.contrib.layers.xavier_initializer())
                             b = tf.get_variable("filterB", shape=[num_filter])
-                            conv = casual_dilated_conv(layerInput,
+                            conv = tf.nn.atrous_conv2d(layerInput,
                                                        filters=w,
                                                        rate=dilation,
                                                        padding="SAME")
