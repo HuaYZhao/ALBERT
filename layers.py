@@ -3,10 +3,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import init_ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import rnn_cell_impl
+from tensorflow.python import ops
+from tensorflow.python.ops import array_ops, init_ops, math_ops, rnn_cell_impl, gen_array_ops
 from tensorflow.python.platform import tf_logging as logging
 
 
@@ -99,3 +97,64 @@ class CoupledInputForgetGateLSTMCell(rnn_cell_impl.RNNCell):
         new_state = (rnn_cell_impl.LSTMStateTuple(c_t, h_t) if self._state_is_tuple else
                      array_ops.concat([c_t, h_t], 1))
         return h_t, new_state
+
+
+def casual_dilated_conv(value, filters, rate, padding, name=None):
+    with ops.name_scope(name, "atrous_conv2d", [value, filters]) as name:
+        value = ops.convert_to_tensor(value, name="value")
+        filters = ops.convert_n_to_tensor(filters, name="filters")
+        if not value.get_shape()[3].is_compatible_with(filters.get_shape()[2]):
+            raise ValueError("")
+        if rate < 1:
+            raise ValueError("")
+        if rate == 1:
+            value = tf.nn.conv2d(input=value,
+                                 filter=filters,
+                                 strides=[1, 1, 1, 1],
+                                 padding=padding)
+            return value
+        if padding == "SAME":
+            if filters.get_shape().is_fully_defined():
+                filter_shape = filters.get_shape().as_list()
+            else:
+                filter_shape = array_ops.shape(filters)
+            filter_width = filter_shape[1]
+
+            filter_width_up = filter_width + (filter_width - 1) * (rate - 1)
+            pad_width = filter_width_up - 1
+
+            pad_left = pad_width // 2
+            pad_right = pad_width - pad_left
+        elif padding == "VALID":
+            pad_left = 0
+            pad_right = 0
+        else:
+            raise ValueError("")
+
+        if value.get_shape().is_fully_defined():
+            value_shape = value.get_shape().as_list()
+        else:
+            value_shape = array_ops.shape(value)
+
+        in_width = value_shape[2] + pad_left + pad_right
+
+        pad_right_extra = (rate - in_width % rate) % rate
+
+        space_to_batch_pad = [[0, 0], [pad_left, pad_right + pad_right_extra]]
+
+        value = gen_array_ops.space_to_batch_nd(input=value,
+                                                paddings=space_to_batch_pad,
+                                                block_shape=[1, rate])
+
+        value = tf.nn.conv2d(input=value,
+                             filters=filters,
+                             strides=[1, 1, 1, 1],
+                             padding="VALID",
+                             name=name)
+
+        batch_to_space_crop = [[0, 0], [0, pad_right_extra]]
+
+        value = gen_array_ops.batch_to_space_nd(input=value,
+                                                crops=batch_to_space_crop,
+                                                block_shape=[1, rate])
+        return value

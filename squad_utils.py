@@ -1636,6 +1636,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             :param idcnn_inputs: [batch_size, num_steps, emb_size]
             :return: [batch_size, num_steps, cnn_output_width]
             """
+            from layers import casual_dilated_conv
             layers = [
                 {
                     'dilation': 1
@@ -1683,7 +1684,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                 shape=[1, filter_width, num_filter, num_filter],
                                 initializer=tf.contrib.layers.xavier_initializer())
                             b = tf.get_variable("filterB", shape=[num_filter])
-                            conv = tf.nn.atrous_conv2d(layerInput,
+                            conv = casual_dilated_conv(layerInput,
                                                        w,
                                                        rate=dilation,
                                                        padding="SAME")
