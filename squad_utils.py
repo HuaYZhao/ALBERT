@@ -1677,14 +1677,16 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     for i in range(len(layers)):
                         dilation = layers[i]['dilation']
                         isLast = True if i == (len(layers) - 1) else False
-                        with tf.variable_scope("atrous-conv-layer-%d" % i,
+                        # with tf.variable_scope("atrous-conv-layer-%d" % i,
+                        #                        reuse=tf.AUTO_REUSE):
+                        with tf.variable_scope("atrous-conv-layer",
                                                reuse=tf.AUTO_REUSE):
                             w = tf.get_variable(
                                 "filterW",
                                 shape=[1, filter_width, num_filter, num_filter],
                                 initializer=tf.contrib.layers.xavier_initializer())
                             b = tf.get_variable("filterB", shape=[num_filter])
-                            conv = tf.nn.atrous_conv2d(layerInput,
+                            conv = casual_dilated_conv(layerInput,
                                                        filters=w,
                                                        rate=dilation,
                                                        padding="SAME")
