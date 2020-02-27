@@ -1713,10 +1713,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         passage_mask = tf.cast(segment_ids, tf.float32)
 
         # refine_output = IDCNN_layer(output)
-        filter_weights = tf.get_variable(
-            "idcnn_filter",
-            shape=[3, albert_config.hidden_size, 384],
-            initializer=modeling.create_initializer())
+        # filter_weights = tf.get_variable(
+        #     "idcnn_filter",
+        #     shape=[3, albert_config.hidden_size, 384],
+        #     initializer=modeling.create_initializer())
         refine_output = IDCNN_layer(output)
 
         encoded_question = refine_output * tf.expand_dims(question_mask, 2)
