@@ -1739,7 +1739,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
         self_w = tf.get_variable(name="self_w",
-                                 shape=[albert_config.hidden_size, albert_config.hidden_size],
+                                 shape=[384, 384],
                                  initializer=modeling.create_initializer(albert_config.initializer_range),
                                  trainable=True)
         self_b = tf.get_variable(name="self_b",
