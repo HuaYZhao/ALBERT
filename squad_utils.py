@@ -1750,7 +1750,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
         self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
 
-        intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
+        # intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
+        intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+
         contextual_p = tf.einsum(" bLe, bL -> bLe ",
                                  biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
                                  passage_mask)
