@@ -645,3 +645,17 @@ time 2
   "NoAns_f1": 85.61816652649286,
   "NoAns_total": 5945
 }
+
+
+2e-5 idcnn co-attention ep4 g100
+{
+  "exact": 77.89943569443275,
+  "f1": 80.70665231873062,
+  "total": 11873,
+  "HasAns_exact": 74.32523616734143,
+  "HasAns_f1": 79.94771980099327,
+  "HasAns_total": 5928,
+  "NoAns_exact": 81.46341463414635,
+  "NoAns_f1": 81.46341463414635,
+  "NoAns_total": 5945
+}
