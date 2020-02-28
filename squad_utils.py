@@ -1602,7 +1602,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                         activation=tf.nn.sigmoid,
                                         use_bias=True,
                                         kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-                fusion = tf.layers.dense(z, albert_config.hidden_size,
+                fusion = tf.layers.dense(z, 384,
                                          activation=tf.nn.tanh,
                                          use_bias=True,
                                          kernel_initializer=modeling.create_initializer(
@@ -1750,14 +1750,14 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
         self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
 
-        # intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
-        intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+        intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
+        # intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
 
         contextual_p = tf.einsum(" bLe, bL -> bLe ",
-                                 biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
+                                 biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer")[0],
                                  passage_mask)
         intermediate_q = tf.einsum(" ble, bl -> ble ",
-                                   biLSTM_layer(p_aware_question, encoding_dim, name="contextual_layer_q")[0],
+                                   biLSTM_layer(p_aware_question, encoding_dim, name="contextual_layer")[0],
                                    question_mask)
         gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
         contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
