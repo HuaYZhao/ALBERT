@@ -1598,7 +1598,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                              attention_mask=question_mask)
         gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1),
                            2) * question_mask  # [bs, q_l]
-        contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+        contextual_q = tf.einsum(" bl, ble -> ble ", gamma, intermediate_q)
 
         output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
 
