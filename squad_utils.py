@@ -1580,16 +1580,19 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         encoded_question = output * tf.expand_dims(question_mask, 2)
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
 
-        from modeling import dot_product_attention
+        from modeling import dot_product_attention, attention_ffn_block
         import sys
 
         q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        # output = q_aware_passage
         p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
-        self_att_p = dot_product_attention(q_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+        self_att_p = tf.einsum(" blh, bLh -> blL ", encoded_passage, encoded_passage)
+        intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+        self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
 
-        print(self_att_p.shape)
+        passage_reper = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+        contextual_p = attention_ffn_block(passage_reper, hidden_size=768, attention_mask=passage_mask)
+        print(contextual_p.shape)
         sys.exit(1)
 
         project_w = tf.get_variable(name="project_w",
