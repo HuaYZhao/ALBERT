@@ -1649,7 +1649,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                 },
             ]
             filter_width = 3
-            num_filter = 384
+            num_filter = albert_config.hidden_size
             repeat_times = 1
 
             layerInput = tf.expand_dims(model_inputs, 1)
