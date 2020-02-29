@@ -1599,7 +1599,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from modeling import dot_product_attention, attention_ffn_block
 
-        encoding_dim = 256
+        encoding_dim = 768
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
