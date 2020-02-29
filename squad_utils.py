@@ -1599,6 +1599,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
 
         output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
+        print(output.shape)
+
 
     # with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
     #
