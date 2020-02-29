@@ -1594,13 +1594,13 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         contextual_p = attention_ffn_block(intermediate_p, hidden_size=768, attention_head_size=768,
                                            attention_mask=passage_mask)  # [bs, seq_len, hidden]
 
-        contextual_q = attention_ffn_block(p_aware_question, hidden_size=768, attention_head_size=768,
-                                           attention_mask=question_mask)
-        gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(contextual_q, 1, use_bias=False), axis=1), 2) * question_mask
-        print(gamma.shape)
-        sys.exit(1)
-        # output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
-        output = contextual_p
+        intermediate_q = attention_ffn_block(p_aware_question, hidden_size=768, attention_head_size=768,
+                                             attention_mask=question_mask)
+        gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1),
+                           2) * question_mask  # [bs, q_l]
+        contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+
+        output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
 
     # with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
     #
