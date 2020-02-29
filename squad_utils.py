@@ -2130,14 +2130,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
-            # start_loss = focal_loss(
-            #     outputs["start_probs"], features["start_positions"])
-            # end_loss = focal_loss(
-            #     outputs["end_probs"], features["end_positions"])
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+            start_loss = focal_loss(
+                outputs["start_probs"], features["start_positions"])
+            end_loss = focal_loss(
+                outputs["end_probs"], features["end_positions"])
 
             total_loss = (start_loss + end_loss) * 0.5
 
