@@ -1559,222 +1559,222 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #
     #     output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
-    # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
-    #
-    #     def fusion_layer(x, y):
-    #         z = tf.concat([x, y, x * y, x - y], axis=2)
-    #         gated = tf.layers.dense(z, 1,
-    #                                 activation=tf.nn.sigmoid,
-    #                                 use_bias=True,
-    #                                 kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-    #         fusion = tf.layers.dense(z, albert_config.hidden_size,
-    #                                  activation=tf.nn.tanh,
-    #                                  use_bias=True,
-    #                                  kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-    #         return gated * fusion + (1 - gated) * x
-    #
-    #     question_mask = tf.cast(
-    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-    #     passage_mask = tf.cast(segment_ids, tf.float32)
-    #
-    #     encoded_question = output * tf.expand_dims(question_mask, 2)
-    #     encoded_passage = output * tf.expand_dims(passage_mask, 2)
-    #
-    #     from modeling import dot_product_attention
-    #
-    #     q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-    #     output = q_aware_passage
-    #     # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-    #
-    #     # project_w = tf.get_variable(name="project_w",
-    #     #                             shape=[albert_config.hidden_size, max_seq_length],
-    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
-    #     #                             trainable=True)
-    #     #
-    #     # output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
-
-    with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
 
         def fusion_layer(x, y):
-            with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
-                z = tf.concat([x, y, x * y, x - y], axis=2)
-                gated = tf.layers.dense(z, 1,
-                                        activation=tf.nn.sigmoid,
-                                        use_bias=True,
-                                        kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-                fusion = tf.layers.dense(z, 384,
-                                         activation=tf.nn.tanh,
-                                         use_bias=True,
-                                         kernel_initializer=modeling.create_initializer(
-                                             albert_config.initializer_range))
+            z = tf.concat([x, y, x * y, x - y], axis=2)
+            gated = tf.layers.dense(z, 1,
+                                    activation=tf.nn.sigmoid,
+                                    use_bias=True,
+                                    kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+            fusion = tf.layers.dense(z, albert_config.hidden_size,
+                                     activation=tf.nn.tanh,
+                                     use_bias=True,
+                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
             return gated * fusion + (1 - gated) * x
 
-        def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
-                         initializer=modeling.create_initializer(albert_config.initializer_range)):
-            from layers import CoupledInputForgetGateLSTMCell
-            with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
-                lstm_cell = {}
-                for direction in ["forward", "backward"]:
-                    with tf.variable_scope(direction):
-                        lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
-                            lstm_dim,
-                            use_peepholes=True,
-                            initializer=initializer,
-                            state_is_tuple=True
-                        )
-                outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
-                    lstm_cell["forward"],
-                    lstm_cell["backward"],
-                    lstm_inputs,
-                    dtype=tf.float32,
-                    sequence_length=lengths
-                )
-            return tf.concat(outputs, axis=2), final_states
-
-        def IDCNN_layer(model_inputs, name=None):
-            """
-            :param idcnn_inputs: [batch_size, num_steps, emb_size]
-            :return: [batch_size, num_steps, cnn_output_width]
-            """
-            from layers import casual_dilated_conv
-            layers = [
-                {
-                    'dilation': 1
-                },
-                {
-                    'dilation': 1
-                },
-                {
-                    'dilation': 2
-                },
-            ]
-            filter_width = 3
-            num_filter = 384
-            repeat_times = 1
-
-            model_inputs = tf.expand_dims(model_inputs, 1)
-            with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
-                shape = [1, filter_width, albert_config.hidden_size,
-                         num_filter]
-                print(shape)
-                filter_weights = tf.get_variable(
-                    "idcnn_filter",
-                    shape=shape,
-                    initializer=modeling.create_initializer())
-
-                """
-                shape of input = [batch, in_height, in_width, in_channels]
-                shape of filter = [filter_height, filter_width, in_channels, out_channels]
-                """
-                layerInput = tf.nn.conv2d(model_inputs,
-                                          filter_weights,
-                                          strides=[1, 1, 1, 1],
-                                          padding="SAME",
-                                          name="init_layer")
-                finalOutFromLayers = []
-                totalWidthForLastDim = 0
-                for j in range(repeat_times):
-                    for i in range(len(layers)):
-                        dilation = layers[i]['dilation']
-                        isLast = True if i == (len(layers) - 1) else False
-                        # with tf.variable_scope("atrous-conv-layer-%d" % i,
-                        #                        reuse=tf.AUTO_REUSE):
-                        with tf.variable_scope("atrous-conv-layer",
-                                               reuse=tf.AUTO_REUSE):
-                            w = tf.get_variable(
-                                "filterW",
-                                shape=[1, filter_width, num_filter, num_filter],
-                                initializer=tf.contrib.layers.xavier_initializer())
-                            b = tf.get_variable("filterB", shape=[num_filter])
-                            conv = casual_dilated_conv(layerInput,
-                                                       filters=w,
-                                                       rate=dilation,
-                                                       padding="SAME")
-                            # conv = tf.nn.atrous_conv2d(layerInput,
-                            # w,
-                            #                          dilations=dilation,
-                            #                          padding="SAME")
-                            conv = tf.nn.bias_add(conv, b)
-                            conv = tf.nn.relu(conv)
-                            if isLast:
-                                finalOutFromLayers.append(conv)
-                                totalWidthForLastDim += num_filter
-                            layerInput = conv
-                # 只取最后一层
-                # finalOut = tf.concat(axis=3, values=finalOutFromLayers)
-                finalOut = finalOutFromLayers[-1]
-                from modeling import dropout
-                finalOut = dropout(finalOut, albert_config.hidden_dropout_prob)
-
-                finalOut = tf.squeeze(finalOut, [1])
-                # finalOut = tf.reshape(finalOut, [-1, totalWidthForLastDim])
-                print("finalOut_shape", finalOut.shape)
-                return finalOut
-
-        encoding_dim = 256
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
 
-        # refine_output = IDCNN_layer(output)
-        # filter_weights = tf.get_variable(
-        #     "idcnn_filter",
-        #     shape=[3, albert_config.hidden_size, 384],
-        #     initializer=modeling.create_initializer())
-        refine_output = IDCNN_layer(output)
+        encoded_question = output * tf.expand_dims(question_mask, 2)
+        encoded_passage = output * tf.expand_dims(passage_mask, 2)
 
-        encoded_question = refine_output * tf.expand_dims(question_mask, 2)
-        encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
+        from modeling import dot_product_attention
 
-        s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
-        alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
+        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        # output = q_aware_passage
+        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
-        q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
-
-        beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
-
-        p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
-
-        # from modeling import dot_product_attention
-        # q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-        q_aware_passage = fusion_layer(encoded_passage, q_aware_p)
-        p_aware_question = fusion_layer(encoded_question, p_aware_q)
-
-        self_w = tf.get_variable(name="self_w",
-                                 shape=[384, 384],
-                                 initializer=modeling.create_initializer(albert_config.initializer_range),
-                                 trainable=True)
-        self_b = tf.get_variable(name="self_b",
-                                 shape=[max_seq_length],
-                                 initializer=modeling.create_initializer(albert_config.initializer_range),
-                                 trainable=True)
-        self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
-        intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
-        self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
-
-        intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
-        # intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
-
-        contextual_p = tf.einsum(" bLe, bL -> bLe ",
-                                 biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer")[0],
-                                 passage_mask)
-        intermediate_q = tf.einsum(" ble, bl -> ble ",
-                                   biLSTM_layer(p_aware_question, encoding_dim, name="contextual_layer")[0],
-                                   question_mask)
-        gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
-        contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
         project_w = tf.get_variable(name="project_w",
-                                    shape=[encoding_dim * 2],
+                                    shape=[albert_config.hidden_size, max_seq_length],
                                     initializer=modeling.create_initializer(albert_config.initializer_range),
                                     trainable=True)
-        output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
-        # project_w = tf.get_variable(name="project_w",
-        #                             shape=[384, max_seq_length],
-        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                             trainable=True)
 
-        # output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
+        output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
+
+    # with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+    #             z = tf.concat([x, y, x * y, x - y], axis=2)
+    #             gated = tf.layers.dense(z, 1,
+    #                                     activation=tf.nn.sigmoid,
+    #                                     use_bias=True,
+    #                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #             fusion = tf.layers.dense(z, 384,
+    #                                      activation=tf.nn.tanh,
+    #                                      use_bias=True,
+    #                                      kernel_initializer=modeling.create_initializer(
+    #                                          albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
+    #                      initializer=modeling.create_initializer(albert_config.initializer_range)):
+    #         from layers import CoupledInputForgetGateLSTMCell
+    #         with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
+    #             lstm_cell = {}
+    #             for direction in ["forward", "backward"]:
+    #                 with tf.variable_scope(direction):
+    #                     lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
+    #                         lstm_dim,
+    #                         use_peepholes=True,
+    #                         initializer=initializer,
+    #                         state_is_tuple=True
+    #                     )
+    #             outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
+    #                 lstm_cell["forward"],
+    #                 lstm_cell["backward"],
+    #                 lstm_inputs,
+    #                 dtype=tf.float32,
+    #                 sequence_length=lengths
+    #             )
+    #         return tf.concat(outputs, axis=2), final_states
+    #
+    #     def IDCNN_layer(model_inputs, name=None):
+    #         """
+    #         :param idcnn_inputs: [batch_size, num_steps, emb_size]
+    #         :return: [batch_size, num_steps, cnn_output_width]
+    #         """
+    #         from layers import casual_dilated_conv
+    #         layers = [
+    #             {
+    #                 'dilation': 1
+    #             },
+    #             {
+    #                 'dilation': 1
+    #             },
+    #             {
+    #                 'dilation': 2
+    #             },
+    #         ]
+    #         filter_width = 3
+    #         num_filter = 384
+    #         repeat_times = 1
+    #
+    #         model_inputs = tf.expand_dims(model_inputs, 1)
+    #         with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
+    #             shape = [1, filter_width, albert_config.hidden_size,
+    #                      num_filter]
+    #             print(shape)
+    #             filter_weights = tf.get_variable(
+    #                 "idcnn_filter",
+    #                 shape=shape,
+    #                 initializer=modeling.create_initializer())
+    #
+    #             """
+    #             shape of input = [batch, in_height, in_width, in_channels]
+    #             shape of filter = [filter_height, filter_width, in_channels, out_channels]
+    #             """
+    #             layerInput = tf.nn.conv2d(model_inputs,
+    #                                       filter_weights,
+    #                                       strides=[1, 1, 1, 1],
+    #                                       padding="SAME",
+    #                                       name="init_layer")
+    #             finalOutFromLayers = []
+    #             totalWidthForLastDim = 0
+    #             for j in range(repeat_times):
+    #                 for i in range(len(layers)):
+    #                     dilation = layers[i]['dilation']
+    #                     isLast = True if i == (len(layers) - 1) else False
+    #                     # with tf.variable_scope("atrous-conv-layer-%d" % i,
+    #                     #                        reuse=tf.AUTO_REUSE):
+    #                     with tf.variable_scope("atrous-conv-layer",
+    #                                            reuse=tf.AUTO_REUSE):
+    #                         w = tf.get_variable(
+    #                             "filterW",
+    #                             shape=[1, filter_width, num_filter, num_filter],
+    #                             initializer=tf.contrib.layers.xavier_initializer())
+    #                         b = tf.get_variable("filterB", shape=[num_filter])
+    #                         conv = casual_dilated_conv(layerInput,
+    #                                                    filters=w,
+    #                                                    rate=dilation,
+    #                                                    padding="SAME")
+    #                         # conv = tf.nn.atrous_conv2d(layerInput,
+    #                         # w,
+    #                         #                          dilations=dilation,
+    #                         #                          padding="SAME")
+    #                         conv = tf.nn.bias_add(conv, b)
+    #                         conv = tf.nn.relu(conv)
+    #                         if isLast:
+    #                             finalOutFromLayers.append(conv)
+    #                             totalWidthForLastDim += num_filter
+    #                         layerInput = conv
+    #             # 只取最后一层
+    #             # finalOut = tf.concat(axis=3, values=finalOutFromLayers)
+    #             finalOut = finalOutFromLayers[-1]
+    #             from modeling import dropout
+    #             finalOut = dropout(finalOut, albert_config.hidden_dropout_prob)
+    #
+    #             finalOut = tf.squeeze(finalOut, [1])
+    #             # finalOut = tf.reshape(finalOut, [-1, totalWidthForLastDim])
+    #             print("finalOut_shape", finalOut.shape)
+    #             return finalOut
+    #
+    #     encoding_dim = 256
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     # refine_output = IDCNN_layer(output)
+    #     # filter_weights = tf.get_variable(
+    #     #     "idcnn_filter",
+    #     #     shape=[3, albert_config.hidden_size, 384],
+    #     #     initializer=modeling.create_initializer())
+    #     refine_output = IDCNN_layer(output)
+    #
+    #     encoded_question = refine_output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
+    #
+    #     s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
+    #     alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
+    #
+    #     q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
+    #
+    #     beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
+    #
+    #     p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+    #
+    #     # from modeling import dot_product_attention
+    #     # q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #     q_aware_passage = fusion_layer(encoded_passage, q_aware_p)
+    #     p_aware_question = fusion_layer(encoded_question, p_aware_q)
+    #
+    #     self_w = tf.get_variable(name="self_w",
+    #                              shape=[384, 384],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_b = tf.get_variable(name="self_b",
+    #                              shape=[max_seq_length],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
+    #     intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+    #     self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
+    #
+    #     intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
+    #     # intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+    #
+    #     contextual_p = tf.einsum(" bLe, bL -> bLe ",
+    #                              biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer")[0],
+    #                              passage_mask)
+    #     intermediate_q = tf.einsum(" ble, bl -> ble ",
+    #                                biLSTM_layer(p_aware_question, encoding_dim, name="contextual_layer")[0],
+    #                                question_mask)
+    #     gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
+    #     contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+    #     project_w = tf.get_variable(name="project_w",
+    #                                 shape=[encoding_dim * 2],
+    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                                 trainable=True)
+    #     output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
+    #     # project_w = tf.get_variable(name="project_w",
+    #     #                             shape=[384, max_seq_length],
+    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                             trainable=True)
+    #
+    #     # output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
 
     output = tf.transpose(output, [1, 0, 2])
 
