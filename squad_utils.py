@@ -1652,7 +1652,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             num_filter = 384
             repeat_times = 1
 
-            model_inputs = tf.expand_dims(model_inputs, 1)
+            layerInput = tf.expand_dims(model_inputs, 1)
             with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
 
                 finalOutFromLayers = []
