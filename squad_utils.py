@@ -1690,7 +1690,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                                        filters=w,
                                                        rate=dilation,
                                                        padding="SAME")
-                            # conv = tf.nn.convolution(layerInput,
+                            # conv = tf.nn.atrous_conv2d(layerInput,
+                            # w,
                             #                          dilations=dilation,
                             #                          padding="SAME")
                             conv = tf.nn.bias_add(conv, b)
