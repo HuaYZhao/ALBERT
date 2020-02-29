@@ -1726,18 +1726,20 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         encoded_question = refine_output * tf.expand_dims(question_mask, 2)
         encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
 
-        # s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
-        # alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
-        #
-        # q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
-        #
-        # beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
-        #
-        # p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+        s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
+        alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
 
-        from modeling import dot_product_attention
-        q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
+
+        beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
+
+        p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+
+        # from modeling import dot_product_attention
+        # q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+        # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        q_aware_passage = fusion_layer(encoded_passage, q_aware_p)
+        p_aware_question = fusion_layer(encoded_question, p_aware_q)
 
         self_w = tf.get_variable(name="self_w",
                                  shape=[384, 384],
