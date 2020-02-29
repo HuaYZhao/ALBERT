@@ -1583,15 +1583,15 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     from modeling import dot_product_attention
     #
     #     q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-    #     # output = q_aware_passage
-    #     p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #     output = q_aware_passage
+    #     # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
     #
-    #     project_w = tf.get_variable(name="project_w",
-    #                                 shape=[albert_config.hidden_size, max_seq_length],
-    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
-    #                                 trainable=True)
-    #
-    #     output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
+    #     # project_w = tf.get_variable(name="project_w",
+    #     #                             shape=[albert_config.hidden_size, max_seq_length],
+    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                             trainable=True)
+    #     #
+    #     # output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
 
     with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
 
@@ -1642,20 +1642,43 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     'dilation': 1
                 },
                 {
-                    'dilation': 1
+                    'dilation': 2
                 },
                 {
-                    'dilation': 2
+                    'dilation': 4
+                },
+                {
+                    'dilation': 8
+                },
+                {
+                    'dilation': 16
                 },
             ]
             filter_width = 3
-            num_filter = albert_config.hidden_size
+            num_filter = 384
             repeat_times = 1
 
-            layerInput = tf.expand_dims(model_inputs, 1)
+            model_inputs = tf.expand_dims(model_inputs, 1)
             with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
+                shape = [1, filter_width, albert_config.hidden_size,
+                         num_filter]
+                print(shape)
+                filter_weights = tf.get_variable(
+                    "idcnn_filter",
+                    shape=shape,
+                    initializer=modeling.create_initializer())
 
+                """
+                shape of input = [batch, in_height, in_width, in_channels]
+                shape of filter = [filter_height, filter_width, in_channels, out_channels]
+                """
+                layerInput = tf.nn.conv2d(model_inputs,
+                                          filter_weights,
+                                          strides=[1, 1, 1, 1],
+                                          padding="SAME",
+                                          name="init_layer")
                 finalOutFromLayers = []
+                totalWidthForLastDim = 0
                 for j in range(repeat_times):
                     for i in range(len(layers)):
                         dilation = layers[i]['dilation']
@@ -1666,7 +1689,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                                reuse=tf.AUTO_REUSE):
                             w = tf.get_variable(
                                 "filterW",
-                                shape=[1, filter_width, albert_config.hidden_size, num_filter],
+                                shape=[1, filter_width, num_filter, num_filter],
                                 initializer=tf.contrib.layers.xavier_initializer())
                             b = tf.get_variable("filterB", shape=[num_filter])
                             conv = casual_dilated_conv(layerInput,
@@ -1681,6 +1704,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                             conv = tf.nn.relu(conv)
                             if isLast:
                                 finalOutFromLayers.append(conv)
+                                totalWidthForLastDim += num_filter
                             layerInput = conv
                 # 只取最后一层
                 # finalOut = tf.concat(axis=3, values=finalOutFromLayers)
@@ -2101,14 +2125,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
-            start_loss = focal_loss(
-                outputs["start_probs"], features["start_positions"])
-            end_loss = focal_loss(
-                outputs["end_probs"], features["end_positions"])
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
+            # start_loss = focal_loss(
+            #     outputs["start_probs"], features["start_positions"])
+            # end_loss = focal_loss(
+            #     outputs["end_probs"], features["end_positions"])
 
             total_loss = (start_loss + end_loss) * 0.5
 
