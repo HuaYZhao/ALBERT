@@ -1654,7 +1654,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
         contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
         project_w = tf.get_variable(name="project_w",
-                                    shape=[encoding_dim],
+                                    shape=[encoding_dim * 2],
                                     initializer=modeling.create_initializer(albert_config.initializer_range),
                                     trainable=True)
         output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
