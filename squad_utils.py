@@ -1625,9 +1625,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #
         # fused_question = dot_product_attention(encoded_question, p_aware_q, encoded_question, bias=None)
 
-        fused_passage = encoded_passage + q_aware_p
+        fused_passage = encoded_passage * q_aware_p
 
-        fused_question = encoded_question + p_aware_q
+        fused_question = encoded_question * p_aware_q
 
         self_w = tf.get_variable(name="self_w",
                                  shape=[albert_config.hidden_size, albert_config.hidden_size],
