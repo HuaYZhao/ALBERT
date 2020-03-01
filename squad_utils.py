@@ -1647,9 +1647,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                            biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
         #                            question_mask)
         contextual_p = attention_ffn_block(intermediate_p, hidden_size=encoding_dim, attention_mask=passage_mask,
-                                           attention_head_size=encoding_dim)
+                                           attention_head_size=768)
         intermediate_q = attention_ffn_block(fused_question, hidden_size=encoding_dim, attention_mask=question_mask,
-                                             attention_head_size=encoding_dim)
+                                             attention_head_size=768)
 
         gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
         contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
