@@ -1560,6 +1560,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
     with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
+        # idcnn 做特征提取，然后做co-attention
 
         def fusion_layer(x, y):
             with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
@@ -1639,16 +1640,16 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # intermediate_p = fusion_layer(fused_passage, self_aware_passage)
         intermediate_p = dot_product_attention(fused_passage, self_aware_passage, fused_passage, bias=None)
 
-        # contextual_p = tf.einsum(" bLe, bL -> bLe ",
-        #                          biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
-        #                          passage_mask)
-        # intermediate_q = tf.einsum(" ble, bl -> ble ",
-        #                            biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
-        #                            question_mask)
-        contextual_p = attention_ffn_block(intermediate_p, hidden_size=encoding_dim, attention_mask=passage_mask,
-                                           attention_head_size=encoding_dim)
-        intermediate_q = attention_ffn_block(fused_question, hidden_size=encoding_dim, attention_mask=question_mask,
-                                             attention_head_size=encoding_dim)
+        contextual_p = tf.einsum(" bLe, bL -> bLe ",
+                                 biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
+                                 passage_mask)
+        intermediate_q = tf.einsum(" ble, bl -> ble ",
+                                   biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
+                                   question_mask)
+        # contextual_p = attention_ffn_block(intermediate_p, hidden_size=encoding_dim, attention_mask=passage_mask,
+        #                                    attention_head_size=encoding_dim)
+        # intermediate_q = attention_ffn_block(fused_question, hidden_size=encoding_dim, attention_mask=question_mask,
+        #                                      attention_head_size=encoding_dim)
 
         gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
         contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
