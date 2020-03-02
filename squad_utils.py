@@ -1615,7 +1615,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         from tcn.tcn import TemporalConvNet
 
-        output = TemporalConvNet(output, [768] * 7)
+        output = TemporalConvNet(output, [768] * 7, kernel_size=3, dropout=albert_config.hidden_dropout_prob,
+                                 use_highway=True)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
         #                              attention_head_size=768)
