@@ -1661,12 +1661,13 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                             initializer=modeling.create_initializer(albert_config.initializer_range),
         #                             trainable=True)
         # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
-        project_w = tf.get_variable(name="project_w",
-                                    shape=[albert_config.hidden_size, max_seq_length],
-                                    initializer=modeling.create_initializer(albert_config.initializer_range),
-                                    trainable=True)
+        # project_w = tf.get_variable(name="project_w",
+        #                             shape=[albert_config.hidden_size, max_seq_length],
+        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+        #                             trainable=True)
 
-        output = tf.einsum(" blh, hL, bLh -> bLh ", p_aware_question, project_w, q_aware_passage)
+        # output = tf.einsum(" blh, hL, bLh -> blh ", p_aware_question, project_w, q_aware_passage)
+        output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
