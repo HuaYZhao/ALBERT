@@ -1613,7 +1613,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
 
-        from tcn.tcn import TemporalConvNet
+        from tcn.tcnbk import TemporalConvNet
 
         output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
                                  use_highway=False)
