@@ -1608,66 +1608,13 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         encoded_question = output * tf.expand_dims(question_mask, 2)
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
 
-        # s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
-        # alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
-        #
-        # q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
-        #
-        # beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
-        #
-        # p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
-
-        # fused_passage = fusion_layer(encoded_passage, q_aware_p)
-        #
-        # fused_question = fusion_layer(encoded_question, p_aware_q)
-        #
-        # fused_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-        #
-        # fused_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-
         q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
         p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        #
-        # self_w = tf.get_variable(name="self_w",
-        #                          shape=[albert_config.hidden_size, albert_config.hidden_size],
-        #                          initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                          trainable=True)
-        # self_b = tf.get_variable(name="self_b",
-        #                          shape=[max_seq_length],
-        #                          initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                          trainable=True)
-        # self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
-        # intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
-        # self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, fused_passage)
-        #
-        # # intermediate_p = fusion_layer(fused_passage, self_aware_passage)
-        # intermediate_p = dot_product_attention(fused_passage, self_aware_passage, fused_passage, bias=None)
-        #
-        # # contextual_p = tf.einsum(" bLe, bL -> bLe ",
-        # #                          biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
-        # #                          passage_mask)
-        # # intermediate_q = tf.einsum(" ble, bl -> ble ",
-        # #                            biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
-        # #                            question_mask)
-        # contextual_p = attention_ffn_block(intermediate_p, hidden_size=encoding_dim, attention_mask=passage_mask,
-        #                                    attention_head_size=768)
-        # intermediate_q = attention_ffn_block(fused_question, hidden_size=encoding_dim, attention_mask=question_mask,
-        #                                      attention_head_size=768)
-        #
-        # gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
-        # contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
-        # project_w = tf.get_variable(name="project_w",
-        #                             shape=[encoding_dim],
-        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                             trainable=True)
-        # output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
-        # project_w = tf.get_variable(name="project_w",
-        #                             shape=[albert_config.hidden_size, max_seq_length],
-        #                             initializer=modeling.create_initializer(albert_config.initializer_range),
-        #                             trainable=True)
 
-        # output = tf.einsum(" blh, hL, bLh -> blh ", p_aware_question, project_w, q_aware_passage)
-        output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
+        contextual_passage = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
+
+        output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
+                                     attention_head_size=768)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
