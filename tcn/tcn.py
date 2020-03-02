@@ -47,14 +47,14 @@ def attentionBlock(x, counters, dropout):
         # [N, L, k_size]
         key = tf.layers.dense(x, units=k_size, activation=None, use_bias=False,
                               kernel_initializer=tf.random_normal_initializer(0, 0.01))
-        key = tf.nn.dropout(key, 1.0 - dropout)
+        key = tf.nn.dropout(key, dropout)
         # [N, L, k_size]
         query = tf.layers.dense(x, units=k_size, activation=None, use_bias=False,
                                 kernel_initializer=tf.random_normal_initializer(0, 0.01))
-        query = tf.nn.dropout(query, 1.0 - dropout)
+        query = tf.nn.dropout(query, dropout)
         value = tf.layers.dense(x, units=v_size, activation=None, use_bias=False,
                                 kernel_initializer=tf.random_normal_initializer(0, 0.01))
-        value = tf.nn.dropout(value, 1.0 - dropout)
+        value = tf.nn.dropout(value, dropout)
 
         logits = tf.matmul(query, key, transpose_b=True)
         logits = logits / np.sqrt(k_size)
@@ -170,7 +170,6 @@ def TemporalBlock(input_layer, out_channels, filter_size, stride, dilation_rate,
     # Returns
         A tensor of shape [N, L, out_channels]
     """
-    keep_prob = 1.0 - dropout
 
     in_channels = input_layer.get_shape()[-1]
     name = get_name('temporal_block', counters)
@@ -185,13 +184,13 @@ def TemporalBlock(input_layer, out_channels, filter_size, stride, dilation_rate,
         # refer to https://colab.research.google.com/drive/1la33lW7FQV1RicpfzyLq9H0SH1VSD4LE#scrollTo=TcFQu3F0y-fy
         # shape should be [N, 1, C]
         noise_shape = (tf.shape(conv1)[0], tf.constant(1), tf.shape(conv1)[2])
-        out1 = tf.nn.dropout(conv1, keep_prob, noise_shape)
+        out1 = tf.nn.dropout(conv1, dropout, noise_shape)
         if atten:
             out1 = attentionBlock(out1, counters, dropout)
 
         conv2 = weightNormConvolution1d(out1, out_channels, dilation_rate, filter_size,
                                         [stride], counters=counters, init=init, gated=gated)
-        out2 = tf.nn.dropout(conv2, keep_prob, noise_shape)
+        out2 = tf.nn.dropout(conv2, dropout, noise_shape)
         if atten:
             out2 = attentionBlock(out2, counters, dropout)
 
