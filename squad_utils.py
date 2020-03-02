@@ -1611,10 +1611,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
         p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
 
-        contextual_passage = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
+        output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
 
-        output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
-                                     attention_head_size=768)
+        # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
+        #                              attention_head_size=768)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
