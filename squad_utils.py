@@ -1625,8 +1625,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #
         # fused_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
 
-        fused_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        fused_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
         #
         # self_w = tf.get_variable(name="self_w",
         #                          shape=[albert_config.hidden_size, albert_config.hidden_size],
@@ -1666,7 +1666,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                     initializer=modeling.create_initializer(albert_config.initializer_range),
                                     trainable=True)
 
-        output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
+        output = tf.einsum(" blh, hL, bLh -> bLh ", p_aware_question, project_w, q_aware_passage)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
