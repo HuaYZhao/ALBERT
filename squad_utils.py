@@ -1614,9 +1614,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
 
         from tcn.tcn import TemporalConvNet
-        tcn = TemporalConvNet([768] * 7)
 
-        output = tcn(output)
+        output = TemporalConvNet(output, [768] * 7)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
         #                              attention_head_size=768)
