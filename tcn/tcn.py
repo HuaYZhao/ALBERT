@@ -84,8 +84,8 @@ class BottleNeckConv1D(Layer):
         self._add_and_activate_layer(upsample_layer)
 
         # this is done to force Keras to add the layers in the list to self._layers
-        for layer in self.layers:
-            self.__setattr__(layer.name, layer)
+        # for layer in self.layers:
+        #     self.__setattr__(layer.name, layer)
 
         super().build(input_shape)
 
@@ -200,7 +200,8 @@ class ResidualBlock(Layer):
             if not self.last_block:
                 # 1x1 conv to match the shapes (channel dimension).
                 name = 'conv1D_{}'.format(k + 1)
-                with K.name_scope(name):
+                # with K.name_scope(name):
+                with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
                     # make and build this layer separately because it directly uses input_shape
                     self.shape_match_conv = Conv1D(filters=self.nb_filters,
                                                    kernel_size=1,
@@ -218,8 +219,8 @@ class ResidualBlock(Layer):
             self.final_activation.build(self.res_output_shape)  # probably isn't necessary
 
             # this is done to force Keras to add the layers in the list to self._layers
-            for layer in self.layers:
-                self.__setattr__(layer.name, layer)
+            # for layer in self.layers:
+            #     self.__setattr__(layer.name, layer)
 
             super(ResidualBlock, self).build(input_shape)  # done to make sure self.built is set True
 
@@ -365,8 +366,8 @@ class TCN(Layer):
                 self.build_output_shape = self.residual_blocks[-1].res_output_shape
 
         # this is done to force keras to add the layers in the list to self._layers
-        for layer in self.residual_blocks:
-            self.__setattr__(layer.name, layer)
+        # for layer in self.residual_blocks:
+        #     self.__setattr__(layer.name, layer)
 
         # Author: @karolbadowski.
         output_slice_index = int(self.build_output_shape.as_list()[1] / 2) if self.padding == 'same' else -1
