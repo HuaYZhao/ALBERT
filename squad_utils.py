@@ -1560,43 +1560,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
     with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
-        # idcnn 做特征提取，然后做co-attention
-
-        def fusion_layer(x, y):
-            with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
-                z = tf.concat([x, y, x * y, x - y], axis=2)
-                gated = tf.layers.dense(z, 1,
-                                        activation=tf.nn.sigmoid,
-                                        use_bias=True,
-                                        kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-                fusion = tf.layers.dense(z, albert_config.hidden_size,
-                                         activation=tf.nn.tanh,
-                                         use_bias=True,
-                                         kernel_initializer=modeling.create_initializer(
-                                             albert_config.initializer_range))
-            return gated * fusion + (1 - gated) * x
-
-        def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
-                         initializer=modeling.create_initializer(albert_config.initializer_range)):
-            from layers import CoupledInputForgetGateLSTMCell
-            with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
-                lstm_cell = {}
-                for direction in ["forward", "backward"]:
-                    with tf.variable_scope(direction):
-                        lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
-                            lstm_dim,
-                            use_peepholes=True,
-                            initializer=initializer,
-                            state_is_tuple=True
-                        )
-                outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
-                    lstm_cell["forward"],
-                    lstm_cell["backward"],
-                    lstm_inputs,
-                    dtype=tf.float32,
-                    sequence_length=lengths
-                )
-            return tf.concat(outputs, axis=2), final_states
 
         # from modeling import dot_product_attention, attention_ffn_block
         #
@@ -1618,10 +1581,30 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
         #                          use_highway=False)
         from tcn.tcn import TCN
-        output = TCN(nb_filters=albert_config.hidden_size, bottleneck_rate=0.2, kernel_size=3,
-                     nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
-                     dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-                     kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=False)(output)
+        from tensorflow.keras.layers import Conv1D
+
+        x = output
+
+        x = Conv1D(filters=int(albert_config.hidden_size * 0.5),
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"downsample_layer",
+                   kernel_initializer=modeling.create_initializer())(x)
+
+        x = TCN(nb_filters=albert_config.hidden_size, bottleneck_rate=0.1, kernel_size=3,
+                nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
+                dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
+                kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=False)(x)
+
+        x = Conv1D(filters=albert_config.hidden_size,
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"upsample_layer",
+                   kernel_initializer=modeling.create_initializer())(x)
+
+        output = x
         print(output.shape)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
