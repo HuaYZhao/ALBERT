@@ -1583,7 +1583,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         from tcn.tcn import TCN
         from tensorflow.keras.layers import Conv1D
         downsample_rate = 1024 / 4096
-        bottleneck_rate = 256 / 1024
+        bottleneck_rate = 512 / 1024
 
         x = output
 
