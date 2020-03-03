@@ -1587,7 +1587,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         x = output
 
-        x = Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
+        x = Conv1D(filters=int(albert_config.hidden_size * 0.5),
                    kernel_size=1,
                    strides=1,
                    padding="same",
@@ -1595,16 +1595,16 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    kernel_initializer=modeling.create_initializer())(x)
         x = Activation("relu")(x)
 
-        # x = Conv1D(filters=int(albert_config.hidden_size * 0.5),
-        #            kernel_size=1,
-        #            strides=1,
-        #            padding="same",
-        #            name=f"downsample_layer",
-        #            kernel_initializer=modeling.create_initializer())(x)
-        # x = Activation("relu")(x)
+        x = Conv1D(filters=int(albert_config.hidden_size * 0.25),
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"downsample_layer",
+                   kernel_initializer=modeling.create_initializer())(x)
+        x = Activation("relu")(x)
 
-        x = TCN(nb_filters=int(albert_config.hidden_size * downsample_rate), bottleneck_rate=bottleneck_rate,
-                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32], padding='same',
+        x = TCN(nb_filters=int(albert_config.hidden_size * 0.25), bottleneck_rate=bottleneck_rate,
+                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
                 use_skip_connections=True,
                 dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
                 kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=True)(x)
