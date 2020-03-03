@@ -1617,7 +1617,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    kernel_initializer=modeling.create_initializer())(x)
         x = Activation("relu")(x)
 
-        output = x
+        output += x
         print(output.shape)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
