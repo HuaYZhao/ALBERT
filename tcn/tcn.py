@@ -22,12 +22,12 @@ def adjust_dilations(dilations):
 class BottleNeckConv1D(Layer):
     def __init__(self,
                  filters,
+                 bottleneck_rate,
                  kernel_size,
                  dilation_rate,
                  padding,
                  name,
                  kernel_initializer,
-                 bottleneck_rate=0.5,
                  **kwargs):
         self.filters = filters
         self.kernel_size = kernel_size
@@ -103,6 +103,7 @@ class ResidualBlock(Layer):
     def __init__(self,
                  dilation_rate,
                  nb_filters,
+                 bottleneck_rate,
                  kernel_size,
                  padding,
                  activation='relu',
@@ -113,7 +114,7 @@ class ResidualBlock(Layer):
                  last_block=True,
                  **kwargs):
 
-        # type: (int, int, int, str, str, float, str, bool, bool, bool, dict) -> None
+        # type: (int, int, float,int, str, str, float, str, bool, bool, bool, dict) -> None
         """Defines the residual block for the WaveNet TCN
 
         Args:
@@ -133,6 +134,7 @@ class ResidualBlock(Layer):
 
         self.dilation_rate = dilation_rate
         self.nb_filters = nb_filters
+        self.bottleneck_rate = bottleneck_rate
         self.kernel_size = kernel_size
         self.padding = padding
         self.activation = activation
@@ -177,6 +179,7 @@ class ResidualBlock(Layer):
                     #                                     name=name,
                     #                                     kernel_initializer=self.kernel_initializer))
                     self._add_and_activate_layer(BottleNeckConv1D(filters=self.nb_filters,
+                                                                  bottleneck_rate=self.bottleneck_rate,
                                                                   kernel_size=self.kernel_size,
                                                                   dilation_rate=self.dilation_rate,
                                                                   padding=self.padding,
@@ -268,6 +271,7 @@ class TCN(Layer):
 
     def __init__(self,
                  nb_filters=64,
+                 bottleneck_rate=0.5,
                  kernel_size=2,
                  nb_stacks=1,
                  dilations=(1, 2, 4, 8, 16, 32),
@@ -286,6 +290,7 @@ class TCN(Layer):
         self.use_skip_connections = use_skip_connections
         self.dilations = dilations
         self.nb_stacks = nb_stacks
+        self.bottleneck_rate = bottleneck_rate
         self.kernel_size = kernel_size
         self.nb_filters = nb_filters
         self.activation = activation
@@ -340,6 +345,7 @@ class TCN(Layer):
             for d in self.dilations:
                 self.residual_blocks.append(ResidualBlock(dilation_rate=d,
                                                           nb_filters=self.nb_filters,
+                                                          bottleneck_rate=self.bottleneck_rate,
                                                           kernel_size=self.kernel_size,
                                                           padding=self.padding,
                                                           activation=self.activation,

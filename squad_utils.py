@@ -1618,8 +1618,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
         #                          use_highway=False)
         from tcn.tcn import TCN
-        output = TCN(nb_filters=albert_config.hidden_size, kernel_size=3, nb_stacks=1,
-                     dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
+        output = TCN(nb_filters=albert_config.hidden_size, bottleneck_rate=0.2, kernel_size=3,
+                     nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
                      dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
                      kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=False)(output)
         print(output.shape)
