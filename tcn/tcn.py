@@ -173,7 +173,8 @@ class ResidualBlock(Layer):
 
             for k in range(2):
                 name = 'conv1D_{}'.format(k)
-                with K.name_scope(name):  # name scope used to make sure weights get unique names
+                # with K.name_scope(name):  # name scope used to make sure weights get unique names
+                with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
                     # self._add_and_activate_layer(Conv1D(filters=self.nb_filters,
                     #                                     kernel_size=self.kernel_size,
                     #                                     dilation_rate=self.dilation_rate,
