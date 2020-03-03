@@ -1,6 +1,7 @@
 import inspect
 from typing import List
 
+import tensorflow as tf
 from tensorflow.keras import backend as K, Model, Input, optimizers
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation, SpatialDropout1D, Lambda
@@ -165,8 +166,8 @@ class ResidualBlock(Layer):
 
     def build(self, input_shape):
 
-        with K.name_scope(self.name):  # name scope used to make sure weights get unique names
-            print(self.name)
+        # with K.name_scope(self.name):  # name scope used to make sure weights get unique names
+        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
             self.layers = []
             self.res_output_shape = input_shape
 
