@@ -166,6 +166,7 @@ class ResidualBlock(Layer):
     def build(self, input_shape):
 
         with K.name_scope(self.name):  # name scope used to make sure weights get unique names
+            print(self.name)
             self.layers = []
             self.res_output_shape = input_shape
 
