@@ -1,7 +1,6 @@
 import inspect
 from typing import List
 
-import tensorflow as tf
 from tensorflow.keras import backend as K, Model, Input, optimizers
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation, SpatialDropout1D, Lambda
@@ -84,8 +83,8 @@ class BottleNeckConv1D(Layer):
         self._add_and_activate_layer(upsample_layer)
 
         # this is done to force Keras to add the layers in the list to self._layers
-        # for layer in self.layers:
-        #     self.__setattr__(layer.name, layer)
+        for layer in self.layers:
+            self.__setattr__(layer.name, layer)
 
         super().build(input_shape)
 
@@ -166,15 +165,13 @@ class ResidualBlock(Layer):
 
     def build(self, input_shape):
 
-        # with K.name_scope(self.name):  # name scope used to make sure weights get unique names
-        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+        with K.name_scope(self.name):  # name scope used to make sure weights get unique names
             self.layers = []
             self.res_output_shape = input_shape
 
             for k in range(2):
                 name = 'conv1D_{}'.format(k)
-                # with K.name_scope(name):  # name scope used to make sure weights get unique names
-                with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+                with K.name_scope(name):  # name scope used to make sure weights get unique names
                     # self._add_and_activate_layer(Conv1D(filters=self.nb_filters,
                     #                                     kernel_size=self.kernel_size,
                     #                                     dilation_rate=self.dilation_rate,
@@ -200,8 +197,7 @@ class ResidualBlock(Layer):
             if not self.last_block:
                 # 1x1 conv to match the shapes (channel dimension).
                 name = 'conv1D_{}'.format(k + 1)
-                # with K.name_scope(name):
-                with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+                with K.name_scope(name):
                     # make and build this layer separately because it directly uses input_shape
                     self.shape_match_conv = Conv1D(filters=self.nb_filters,
                                                    kernel_size=1,
@@ -219,8 +215,8 @@ class ResidualBlock(Layer):
             self.final_activation.build(self.res_output_shape)  # probably isn't necessary
 
             # this is done to force Keras to add the layers in the list to self._layers
-            # for layer in self.layers:
-            #     self.__setattr__(layer.name, layer)
+            for layer in self.layers:
+                self.__setattr__(layer.name, layer)
 
             super(ResidualBlock, self).build(input_shape)  # done to make sure self.built is set True
 
@@ -358,16 +354,15 @@ class TCN(Layer):
                                                           use_layer_norm=self.use_layer_norm,
                                                           kernel_initializer=self.kernel_initializer,
                                                           last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                                                          # name='residual_block_{}'.format(len(self.residual_blocks))
-                                                          name='residual_block'
+                                                          name='residual_block_{}'.format(len(self.residual_blocks))
                                                           ))
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
                 self.build_output_shape = self.residual_blocks[-1].res_output_shape
 
         # this is done to force keras to add the layers in the list to self._layers
-        # for layer in self.residual_blocks:
-        #     self.__setattr__(layer.name, layer)
+        for layer in self.residual_blocks:
+            self.__setattr__(layer.name, layer)
 
         # Author: @karolbadowski.
         output_slice_index = int(self.build_output_shape.as_list()[1] / 2) if self.padding == 'same' else -1
