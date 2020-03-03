@@ -56,14 +56,14 @@ class BottleNeckConv1D(Layer):
 
         self.bottleneck_output_shape = input_shape
 
-        downsample_layer = Conv1D(filters=self.filters * self.bottleneck_rate,
+        downsample_layer = Conv1D(filters=int(self.filters * self.bottleneck_rate),
                                   kernel_size=1,
                                   strides=1,
                                   padding=self.padding,
                                   name=f"{self.conv_name}_downsample_layer",
                                   kernel_initializer=self.kernel_initializer)
 
-        dilation_layer = Conv1D(filters=self.filters * self.bottleneck_rate,
+        dilation_layer = Conv1D(filters=int(self.filters * self.bottleneck_rate),
                                 kernel_size=self.kernel_size,
                                 dilation_rate=self.dilation_rate,
                                 padding=self.padding,
