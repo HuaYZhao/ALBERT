@@ -19,6 +19,85 @@ def adjust_dilations(dilations):
         return new_dilations
 
 
+class BottleNeckConv1D(Layer):
+    def __init__(self,
+                 filters,
+                 kernel_size,
+                 dilation_rate,
+                 padding,
+                 name,
+                 kernel_initializer,
+                 bottleneck_rate=0.5,
+                 **kwargs):
+        self.filters = filters
+        self.kernel_size = kernel_size
+        self.dilation_rate = dilation_rate
+        self.padding = padding
+        self.conv_name = name
+        self.kernel_initializer = kernel_initializer
+        self.bottleneck_rate = bottleneck_rate
+        self.layers = []
+        self.bottleneck_output_shape = None
+        super(BottleNeckConv1D, self).__init__(**kwargs)
+
+    def _add_and_activate_layer(self, layer):
+        """Helper function for building layer
+
+        Args:
+            layer: Appends layer to internal layer list and builds it based on the current output
+                   shape of ResidualBlocK. Updates current output shape.
+
+        """
+        self.layers.append(layer)
+        self.layers[-1].build(self.bottleneck_output_shape)
+        self.bottleneck_output_shape = self.layers[-1].compute_output_shape(self.bottleneck_output_shape)
+
+    def build(self, input_shape):
+
+        self.bottleneck_output_shape = input_shape
+
+        downsample_layer = Conv1D(filters=self.filters * self.bottleneck_rate,
+                                  kernel_size=1,
+                                  strides=1,
+                                  padding=self.padding,
+                                  name=f"{self.conv_name}_downsample_layer",
+                                  kernel_initializer=self.kernel_initializer)
+
+        dilation_layer = Conv1D(filters=self.filters * self.bottleneck_rate,
+                                kernel_size=self.kernel_size,
+                                dilation_rate=self.dilation_rate,
+                                padding=self.padding,
+                                name=f"{self.conv_name}_dilation_layer",
+                                kernel_initializer=self.kernel_initializer)
+
+        upsample_layer = Conv1D(filters=self.filters,
+                                kernel_size=1,
+                                padding=self.padding,
+                                name=f"{self.conv_name}_upsample_layer",
+                                kernel_initializer=self.kernel_initializer)
+
+        self._add_and_activate_layer(downsample_layer)
+        self._add_and_activate_layer(Activation('relu'))
+        self._add_and_activate_layer(dilation_layer)
+        self._add_and_activate_layer(Activation('relu'))
+        self._add_and_activate_layer(upsample_layer)
+
+        # this is done to force Keras to add the layers in the list to self._layers
+        for layer in self.layers:
+            self.__setattr__(layer.name, layer)
+
+        super().build(input_shape)
+
+    def call(self, inputs, **kwargs):
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+    def compute_output_shape(self, input_shape):
+        return self.bottleneck_output_shape
+
+
 class ResidualBlock(Layer):
 
     def __init__(self,
@@ -91,12 +170,18 @@ class ResidualBlock(Layer):
             for k in range(2):
                 name = 'conv1D_{}'.format(k)
                 with K.name_scope(name):  # name scope used to make sure weights get unique names
-                    self._add_and_activate_layer(Conv1D(filters=self.nb_filters,
-                                                        kernel_size=self.kernel_size,
-                                                        dilation_rate=self.dilation_rate,
-                                                        padding=self.padding,
-                                                        name=name,
-                                                        kernel_initializer=self.kernel_initializer))
+                    # self._add_and_activate_layer(Conv1D(filters=self.nb_filters,
+                    #                                     kernel_size=self.kernel_size,
+                    #                                     dilation_rate=self.dilation_rate,
+                    #                                     padding=self.padding,
+                    #                                     name=name,
+                    #                                     kernel_initializer=self.kernel_initializer))
+                    self._add_and_activate_layer(BottleNeckConv1D(filters=self.nb_filters,
+                                                                  kernel_size=self.kernel_size,
+                                                                  dilation_rate=self.dilation_rate,
+                                                                  padding=self.padding,
+                                                                  name=name,
+                                                                  kernel_initializer=self.kernel_initializer))
 
                 if self.use_batch_norm:
                     self._add_and_activate_layer(BatchNormalization())
