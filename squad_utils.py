@@ -1582,7 +1582,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                          use_highway=False)
         from tcn.tcn import TCN
         from tensorflow.keras.layers import Conv1D
-        downsample_rate = 0.2
+        downsample_rate = 512 / 4096
+        bottleneck_rate = 256 / 512
 
         x = output
 
@@ -1593,10 +1594,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    name=f"downsample_layer",
                    kernel_initializer=modeling.create_initializer())(x)
 
-        x = TCN(nb_filters=int(albert_config.hidden_size * downsample_rate), bottleneck_rate=0.1, kernel_size=3,
-                nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
-                dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-                kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=False)(x)
+        x = TCN(nb_filters=int(albert_config.hidden_size * downsample_rate), bottleneck_rate=bottleneck_rate,
+                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
+                use_skip_connections=True, dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True,
+                activation='linear', kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=False)(x)
 
         x = Conv1D(filters=albert_config.hidden_size,
                    kernel_size=1,
