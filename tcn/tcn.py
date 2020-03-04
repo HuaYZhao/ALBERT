@@ -98,9 +98,6 @@ class BottleNeckConv1D(Layer):
     def compute_output_shape(self, input_shape):
         return self.bottleneck_output_shape
 
-    def set_dilation_rate(self, dilation_rate):
-        self.layers[2].__setattr__("dilation_rate", dilation_rate)
-
 
 class ResidualBlock(Layer):
 
@@ -247,10 +244,6 @@ class ResidualBlock(Layer):
     def compute_output_shape(self, input_shape):
         return [self.res_output_shape, self.res_output_shape]
 
-    def set_dilation_rate(self, dilation_rate):
-        self.layers[0].set_dilation_rate(dilation_rate)
-        self.layers[5].set_dilation_rate(dilation_rate)
-
 
 class TCN(Layer):
     """Creates a TCN layer.
@@ -350,34 +343,19 @@ class TCN(Layer):
             total_num_blocks += 1  # cheap way to do a false case for below
 
         for s in range(self.nb_stacks):
-            rblock = ResidualBlock(dilation_rate=1,
-                                   nb_filters=self.nb_filters,
-                                   bottleneck_rate=self.bottleneck_rate,
-                                   kernel_size=self.kernel_size,
-                                   padding=self.padding,
-                                   activation=self.activation,
-                                   dropout_rate=self.dropout_rate,
-                                   use_batch_norm=self.use_batch_norm,
-                                   use_layer_norm=self.use_layer_norm,
-                                   kernel_initializer=self.kernel_initializer,
-                                   last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                                   name='residual_block')
             for d in self.dilations:
-                # self.residual_blocks.append(ResidualBlock(dilation_rate=d,
-                #                                           nb_filters=self.nb_filters,
-                #                                           bottleneck_rate=self.bottleneck_rate,
-                #                                           kernel_size=self.kernel_size,
-                #                                           padding=self.padding,
-                #                                           activation=self.activation,
-                #                                           dropout_rate=self.dropout_rate,
-                #                                           use_batch_norm=self.use_batch_norm,
-                #                                           use_layer_norm=self.use_layer_norm,
-                #                                           kernel_initializer=self.kernel_initializer,
-                #                                           last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                #                                           name='residual_block_{}'.format(len(self.residual_blocks))))
-                new_rblock = deepcopy(rblock)
-                new_rblock.set_dilation_rate(d)
-                self.residual_blocks.append(new_rblock)
+                self.residual_blocks.append(ResidualBlock(dilation_rate=d,
+                                                          nb_filters=self.nb_filters,
+                                                          bottleneck_rate=self.bottleneck_rate,
+                                                          kernel_size=self.kernel_size,
+                                                          padding=self.padding,
+                                                          activation=self.activation,
+                                                          dropout_rate=self.dropout_rate,
+                                                          use_batch_norm=self.use_batch_norm,
+                                                          use_layer_norm=self.use_layer_norm,
+                                                          kernel_initializer=self.kernel_initializer,
+                                                          last_block=len(self.residual_blocks) + 1 == total_num_blocks,
+                                                          name='residual_block_{}'.format(len(self.residual_blocks))))
 
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
