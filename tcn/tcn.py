@@ -4,7 +4,7 @@ from typing import List
 from tensorflow.keras import backend as K, Model, Input, optimizers
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation, SpatialDropout1D, Lambda
-from tensorflow.keras.layers import Layer, Conv1D, Dense, BatchNormalization, LayerNormalization
+from tensorflow.keras.layers import Layer, SeparableConv1D, Conv1D, Dense, BatchNormalization, LayerNormalization
 import tensorflow as tf
 
 
@@ -64,12 +64,12 @@ class BottleNeckConv1D(Layer):
                                   name=f"{self.conv_name}_downsample_layer",
                                   kernel_initializer=self.kernel_initializer)
 
-        dilation_layer = Conv1D(filters=int(self.filters * self.bottleneck_rate),
-                                kernel_size=self.kernel_size,
-                                dilation_rate=self.dilation_rate,
-                                padding=self.padding,
-                                name=f"{self.conv_name}_dilation_layer",
-                                kernel_initializer=self.kernel_initializer)
+        dilation_layer = SeparableConv1D(filters=int(self.filters * self.bottleneck_rate),
+                                         kernel_size=self.kernel_size,
+                                         dilation_rate=self.dilation_rate,
+                                         padding=self.padding,
+                                         name=f"{self.conv_name}_dilation_layer",
+                                         kernel_initializer=self.kernel_initializer)
 
         upsample_layer = Conv1D(filters=self.filters,
                                 kernel_size=1,
@@ -78,8 +78,10 @@ class BottleNeckConv1D(Layer):
                                 kernel_initializer=self.kernel_initializer)
 
         self._add_and_activate_layer(downsample_layer)
+        self._add_and_activate_layer(BatchNormalization())
         self._add_and_activate_layer(Activation('relu'))
         self._add_and_activate_layer(dilation_layer)
+        self._add_and_activate_layer(BatchNormalization())
         self._add_and_activate_layer(Activation('relu'))
         self._add_and_activate_layer(upsample_layer)
 

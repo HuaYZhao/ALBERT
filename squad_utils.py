@@ -1586,73 +1586,36 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         bottleneck_rate = 256 / 1024
 
         partial_attention_model = tf.keras.Sequential([
-            SeparableConv1D(filters=int(albert_config.hidden_size * 0.5),
-                            kernel_size=1,
-                            strides=1,
-                            padding="same",
-                            name=f"downsample_layer_1",
-                            kernel_initializer=modeling.create_initializer()),
+            Conv1D(filters=int(albert_config.hidden_size * 0.5),
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"downsample_layer_1",
+                   kernel_initializer=modeling.create_initializer()),
             Activation("relu"),
-            SeparableConv1D(filters=int(albert_config.hidden_size * 0.25),
-                            kernel_size=1,
-                            strides=1,
-                            padding="same",
-                            name=f"downsample_layer_2",
-                            kernel_initializer=modeling.create_initializer()),
+            Conv1D(filters=int(albert_config.hidden_size * 0.25),
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"downsample_layer_2",
+                   kernel_initializer=modeling.create_initializer()),
             Activation("relu"),
             TCN(nb_filters=int(albert_config.hidden_size * 0.25), bottleneck_rate=bottleneck_rate,
-                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
+                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64, 128], padding='same',
                 use_skip_connections=True,
                 dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
                 kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=True),
-            SeparableConv1D(filters=albert_config.hidden_size,
-                            kernel_size=1,
-                            strides=1,
-                            padding="same",
-                            name=f"upsample_layer",
-                            kernel_initializer=modeling.create_initializer()),
+            Conv1D(filters=albert_config.hidden_size,
+                   kernel_size=1,
+                   strides=1,
+                   padding="same",
+                   name=f"upsample_layer",
+                   kernel_initializer=modeling.create_initializer()),
             Activation("relu"),
         ])
 
         x = partial_attention_model(output)
         output += x
-
-        # x = output
-        #
-        # x = Conv1D(filters=int(albert_config.hidden_size * 0.5),
-        #            kernel_size=1,
-        #            strides=1,
-        #            padding="same",
-        #            name=f"downsample_layer_1",
-        #            kernel_initializer=modeling.create_initializer())(x)
-        # # x = BatchNormalization()(x)
-        # x = Activation("relu")(x)
-        #
-        # x = Conv1D(filters=int(albert_config.hidden_size * 0.25),
-        #            kernel_size=1,
-        #            strides=1,
-        #            padding="same",
-        #            name=f"downsample_layer_2",
-        #            kernel_initializer=modeling.create_initializer())(x)
-        # # x = BatchNormalization()(x)
-        # x = Activation("relu")(x)
-        #
-        # x = TCN(nb_filters=int(albert_config.hidden_size * 0.25), bottleneck_rate=bottleneck_rate,
-        #         kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
-        #         use_skip_connections=True,
-        #         dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-        #         kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=True)(x)
-        #
-        # x = Conv1D(filters=albert_config.hidden_size,
-        #            kernel_size=1,
-        #            strides=1,
-        #            padding="same",
-        #            name=f"upsample_layer",
-        #            kernel_initializer=modeling.create_initializer())(x)
-        # # x = BatchNormalization()(x)
-        # x = Activation("relu")(x)
-        #
-        # output += x
         print(output.shape)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
