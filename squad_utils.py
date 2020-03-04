@@ -1594,7 +1594,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    strides=1,
                    padding="same",
                    name=f"downsample_layer_1",
-                   kernel_initializer="he_normal")(x)
+                   kernel_initializer=modeling.create_initializer())(x)
         # x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
@@ -1603,7 +1603,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    strides=1,
                    padding="same",
                    name=f"downsample_layer_2",
-                   kernel_initializer="he_normal")(x)
+                   kernel_initializer=modeling.create_initializer())(x)
         # x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
@@ -1618,7 +1618,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    strides=1,
                    padding="same",
                    name=f"upsample_layer",
-                   kernel_initializer="he_normal")(x)
+                   kernel_initializer=modeling.create_initializer())(x)
         # x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
