@@ -354,8 +354,9 @@ class TCN(Layer):
                                                           use_layer_norm=self.use_layer_norm,
                                                           kernel_initializer=self.kernel_initializer,
                                                           last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                                                          name='residual_block_{}'.format(len(self.residual_blocks))
-                                                          ))
+                                                          name='residual_block_{}'.format(len(self.residual_blocks)),
+                                                          params=self.residual_blocks[-1].params))
+
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
                 self.build_output_shape = self.residual_blocks[-1].res_output_shape
