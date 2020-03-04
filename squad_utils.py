@@ -1612,6 +1612,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    padding="same",
                    name=f"upsample_layer",
                    kernel_initializer=modeling.create_initializer()),
+            BatchNormalization(),
             Activation("relu"),
         ])
 

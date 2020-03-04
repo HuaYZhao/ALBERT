@@ -78,10 +78,10 @@ class BottleNeckConv1D(Layer):
                                 kernel_initializer=self.kernel_initializer)
 
         self._add_and_activate_layer(downsample_layer)
-        self._add_and_activate_layer(BatchNormalization())
+        # self._add_and_activate_layer(BatchNormalization())
         self._add_and_activate_layer(Activation('relu'))
         self._add_and_activate_layer(dilation_layer)
-        self._add_and_activate_layer(BatchNormalization())
+        # self._add_and_activate_layer(BatchNormalization())
         self._add_and_activate_layer(Activation('relu'))
         self._add_and_activate_layer(upsample_layer)
 
