@@ -245,6 +245,22 @@ class ResidualBlock(Layer):
         return [self.res_output_shape, self.res_output_shape]
 
 
+def residual_block_layer(dilation_rate,
+                         nb_filters,
+                         bottleneck_rate,
+                         kernel_size,
+                         padding,
+                         activation='relu',
+                         dropout_rate=0,
+                         kernel_initializer='he_normal',
+                         use_batch_norm=False,
+                         use_layer_norm=False,
+                         last_block=True,
+                         name="residual_block"):
+    """ for reuse params """
+    pass
+
+
 class TCN(Layer):
     """Creates a TCN layer.
 
