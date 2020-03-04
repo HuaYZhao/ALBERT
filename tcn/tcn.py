@@ -5,7 +5,7 @@ from tensorflow.keras import backend as K, Model, Input, optimizers
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation, SpatialDropout1D, Lambda
 from tensorflow.keras.layers import Layer, Conv1D, Dense, BatchNormalization, LayerNormalization
-from copy import deepcopy
+import tensorflow as tf
 
 
 def is_power_of_two(num):
@@ -245,7 +245,8 @@ class ResidualBlock(Layer):
         return [self.res_output_shape, self.res_output_shape]
 
 
-def residual_block_layer(dilation_rate,
+def residual_block_layer(x,
+                         dilation_rate,
                          nb_filters,
                          bottleneck_rate,
                          kernel_size,
@@ -358,20 +359,24 @@ class TCN(Layer):
         if not self.use_skip_connections:
             total_num_blocks += 1  # cheap way to do a false case for below
 
-        for s in range(self.nb_stacks):
-            for d in self.dilations:
-                self.residual_blocks.append(ResidualBlock(dilation_rate=d,
-                                                          nb_filters=self.nb_filters,
-                                                          bottleneck_rate=self.bottleneck_rate,
-                                                          kernel_size=self.kernel_size,
-                                                          padding=self.padding,
-                                                          activation=self.activation,
-                                                          dropout_rate=self.dropout_rate,
-                                                          use_batch_norm=self.use_batch_norm,
-                                                          use_layer_norm=self.use_layer_norm,
-                                                          kernel_initializer=self.kernel_initializer,
-                                                          last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                                                          name='residual_block_{}'.format(len(self.residual_blocks))))
+        with tf.variable_scope("tcn", reuse=tf.AUTO_REUSE):
+            for s in range(self.nb_stacks):
+                for d in self.dilations:
+                    self.residual_blocks.append(ResidualBlock(dilation_rate=d,
+                                                              nb_filters=self.nb_filters,
+                                                              bottleneck_rate=self.bottleneck_rate,
+                                                              kernel_size=self.kernel_size,
+                                                              padding=self.padding,
+                                                              activation=self.activation,
+                                                              dropout_rate=self.dropout_rate,
+                                                              use_batch_norm=self.use_batch_norm,
+                                                              use_layer_norm=self.use_layer_norm,
+                                                              kernel_initializer=self.kernel_initializer,
+                                                              last_block=len(
+                                                                  self.residual_blocks) + 1 == total_num_blocks,
+                                                              # name='residual_block_{}'.format(len(self.residual_blocks)),
+                                                              name="residual_block"
+                                                              ))
 
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
