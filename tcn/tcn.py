@@ -354,11 +354,13 @@ class TCN(Layer):
                                                           use_layer_norm=self.use_layer_norm,
                                                           kernel_initializer=self.kernel_initializer,
                                                           last_block=len(self.residual_blocks) + 1 == total_num_blocks,
-                                                          name='residual_block_{}'.format(len(self.residual_blocks)),
-                                                          weights=self.residual_blocks[-1].weights))
+                                                          name='residual_block_{}'.format(len(self.residual_blocks))))
 
                 # build newest residual block
                 self.residual_blocks[-1].build(self.build_output_shape)
+                # share the layer module weights
+                if len(self.residual_blocks) > 1:
+                    self.residual_blocks[-1].weights = self.residual_blocks[0].weights
                 self.build_output_shape = self.residual_blocks[-1].res_output_shape
 
         # this is done to force keras to add the layers in the list to self._layers
