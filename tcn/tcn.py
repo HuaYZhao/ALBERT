@@ -245,23 +245,6 @@ class ResidualBlock(Layer):
         return [self.res_output_shape, self.res_output_shape]
 
 
-def residual_block_layer(x,
-                         dilation_rate,
-                         nb_filters,
-                         bottleneck_rate,
-                         kernel_size,
-                         padding,
-                         activation='relu',
-                         dropout_rate=0,
-                         kernel_initializer='he_normal',
-                         use_batch_norm=False,
-                         use_layer_norm=False,
-                         last_block=True,
-                         name="residual_block"):
-    """ for reuse params """
-    pass
-
-
 class TCN(Layer):
     """Creates a TCN layer.
 
@@ -371,13 +354,11 @@ class TCN(Layer):
                                                           use_batch_norm=self.use_batch_norm,
                                                           use_layer_norm=self.use_layer_norm,
                                                           kernel_initializer=self.kernel_initializer,
-                                                          last_block=len(
-                                                              self.residual_blocks) + 1 == total_num_blocks,
+                                                          last_block=len(self.residual_blocks) + 1 == total_num_blocks,
                                                           name='residual_block_{}'.format(len(self.residual_blocks))))
-
-            # build newest residual block
-            self.residual_blocks[-1].build(self.build_output_shape)
-            self.build_output_shape = self.residual_blocks[-1].res_output_shape
+                # build newest residual block
+                self.residual_blocks[-1].build(self.build_output_shape)
+                self.build_output_shape = self.residual_blocks[-1].res_output_shape
 
         # this is done to force keras to add the layers in the list to self._layers
         for layer in self.residual_blocks:

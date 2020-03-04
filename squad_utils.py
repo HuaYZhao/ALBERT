@@ -1607,7 +1607,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                 kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
                 use_skip_connections=True,
                 dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-                kernel_initializer='he_normal', use_batch_norm=True, use_layer_norm=True)(x)
+                kernel_initializer=modeling.create_initializer(), use_batch_norm=True, use_layer_norm=True)(x)
 
         x = Conv1D(filters=albert_config.hidden_size,
                    kernel_size=1,
