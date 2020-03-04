@@ -1581,7 +1581,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
         #                          use_highway=False)
         from tcn.tcn import TCN
-        from tensorflow.keras.layers import Conv1D, Activation
+        from tensorflow.keras.layers import Conv1D, Activation, BatchNormalization, LayerNormalization
         downsample_rate = 1024 / 4096
         bottleneck_rate = 256 / 1024
 
@@ -1593,6 +1593,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    padding="same",
                    name=f"downsample_layer_1",
                    kernel_initializer="he_normal")(x)
+        x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
         x = Conv1D(filters=int(albert_config.hidden_size * 0.25),
@@ -1601,6 +1602,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    padding="same",
                    name=f"downsample_layer_2",
                    kernel_initializer="he_normal")(x)
+        x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
         x = TCN(nb_filters=int(albert_config.hidden_size * 0.25), bottleneck_rate=bottleneck_rate,
@@ -1615,6 +1617,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                    padding="same",
                    name=f"upsample_layer",
                    kernel_initializer="he_normal")(x)
+        x = BatchNormalization()(x)
         x = Activation("relu")(x)
 
         output += x
