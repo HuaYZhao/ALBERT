@@ -20,6 +20,20 @@ def adjust_dilations(dilations):
         return new_dilations
 
 
+class FlattenConv1D(Conv1D):
+
+    def __init__(self, filters, kernel_size, strides=1, padding='valid', data_format='channels_last', dilation_rate=1,
+                 activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                 kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, kernel_constraint=None,
+                 bias_constraint=None, **kwargs):
+        super().__init__(filters, kernel_size, strides, padding, data_format, dilation_rate, activation, use_bias,
+                         kernel_initializer, bias_initializer, kernel_regularizer, bias_regularizer,
+                         activity_regularizer, kernel_constraint, bias_constraint, **kwargs)
+
+    def call(self, inputs):
+        return super().call(inputs)
+
+
 class BottleNeckConv1D(Layer):
     def __init__(self,
                  filters,
