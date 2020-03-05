@@ -1582,48 +1582,42 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                          use_highway=False)
         from tcn.tcn import TCN
         from tensorflow.keras.layers import Conv1D, SeparableConv1D, Activation, BatchNormalization, LayerNormalization
-        # downsample_rate = 2048 / 4096
-        # bottleneck_rate = 512 / 1024
-        #
-        # partial_attention_model = tf.keras.Sequential([
-        #     # Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
-        #     #        kernel_size=1,
-        #     #        strides=1,
-        #     #        padding="same",
-        #     #        name=f"downsample_layer_1",
-        #     #        kernel_initializer=modeling.create_initializer()),
-        #     # BatchNormalization(),
-        #     # Activation("relu"),
-        #     # Conv1D(filters=int(albert_config.hidden_size * 0.25),
-        #     #        kernel_size=1,
-        #     #        strides=1,
-        #     #        padding="same",
-        #     #        name=f"downsample_layer_2",
-        #     #        kernel_initializer=modeling.create_initializer()),
-        #     # BatchNormalization(),
-        #     # Activation("relu"),
-        #     TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=1.,
-        #         kernel_size=3, nb_stacks=1, dilations=[1, 2, 4], padding='same',
-        #         use_skip_connections=True,
-        #         dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-        #         kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False),
-        #     # Conv1D(filters=albert_config.hidden_size,
-        #     #        kernel_size=1,
-        #     #        strides=1,
-        #     #        padding="same",
-        #     #        name=f"upsample_layer",
-        #     #        kernel_initializer=modeling.create_initializer()),
-        #     # BatchNormalization(),
-        #     # Activation("relu"),
-        # ])
-        #
-        # x = partial_attention_model(output)
+        downsample_rate = 2048 / 4096
+        bottleneck_rate = 512 / 1024
 
-        x = TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
-                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4], padding='same',
+        partial_attention_model = tf.keras.Sequential([
+            # Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
+            #        kernel_size=1,
+            #        strides=1,
+            #        padding="same",
+            #        name=f"downsample_layer_1",
+            #        kernel_initializer=modeling.create_initializer()),
+            # BatchNormalization(),
+            # Activation("relu"),
+            # Conv1D(filters=int(albert_config.hidden_size * 0.25),
+            #        kernel_size=1,
+            #        strides=1,
+            #        padding="same",
+            #        name=f"downsample_layer_2",
+            #        kernel_initializer=modeling.create_initializer()),
+            # BatchNormalization(),
+            # Activation("relu"),
+            TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
+                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
                 use_skip_connections=True,
                 dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-                kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False)(output)
+                kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False),
+            # Conv1D(filters=albert_config.hidden_size,
+            #        kernel_size=1,
+            #        strides=1,
+            #        padding="same",
+            #        name=f"upsample_layer",
+            #        kernel_initializer=modeling.create_initializer()),
+            # BatchNormalization(),
+            # Activation("relu"),
+        ])
+
+        x = partial_attention_model(output)
         output += x
         print(output.shape)
 
