@@ -1619,7 +1619,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #
         # x = partial_attention_model(output)
 
-        x = TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=1.,
+        x = TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
                 kernel_size=3, nb_stacks=1, dilations=[1, 2, 4], padding='same',
                 use_skip_connections=True,
                 dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
