@@ -1560,6 +1560,19 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
     with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
+        def fusion_layer(x, y):
+            with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+                z = tf.concat([x, y, x * y, x - y], axis=2)
+                gated = tf.layers.dense(z, 1,
+                                        activation=tf.nn.sigmoid,
+                                        use_bias=True,
+                                        kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+                fusion = tf.layers.dense(z, albert_config.hidden_size,
+                                         activation=tf.nn.tanh,
+                                         use_bias=True,
+                                         kernel_initializer=modeling.create_initializer(
+                                             albert_config.initializer_range))
+            return gated * fusion + (1 - gated) * x
 
         # from modeling import dot_product_attention, attention_ffn_block
         #
@@ -1618,7 +1631,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         ])
 
         x = partial_attention_model(output)
-        output += x
+        # output += x
+        output = fusion_layer(output, x)
         print(output.shape)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
