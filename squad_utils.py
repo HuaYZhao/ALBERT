@@ -1446,9 +1446,9 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
 def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                    hub_module):
+                    hub_module, embedded_inputs=None):
     """Creates a classification model."""
-    (pool_output, output, all_encoder_layers) = fine_tuning_utils.create_albert(
+    (pool_output, output, all_encoder_layers, word_embedding_output) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1456,7 +1456,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         segment_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=True,
-        hub_module=hub_module)
+        hub_module=hub_module,
+        embedded_inputs=embedded_inputs)
 
     bsz = tf.shape(output)[0]
     seq_length = modeling.get_shape_list(output)[1]
@@ -1466,6 +1467,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return_dict["sequence_output"] = output
     return_dict["pool_output"] = pool_output
     return_dict["all_encoder_layers"] = all_encoder_layers
+    return_dict["word_embedding_output"] = word_embedding_output
 
     # with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
     #
@@ -1559,84 +1561,84 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     #     #
     #     # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
 
-    with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
-        def fusion_layer(x, y):
-            with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
-                z = tf.concat([x, y, x * y, x - y], axis=2)
-                gated = tf.layers.dense(z, 1,
-                                        activation=tf.nn.sigmoid,
-                                        use_bias=True,
-                                        kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
-                fusion = tf.layers.dense(z, albert_config.hidden_size,
-                                         activation=tf.nn.tanh,
-                                         use_bias=True,
-                                         kernel_initializer=modeling.create_initializer(
-                                             albert_config.initializer_range))
-            return gated * fusion + (1 - gated) * x
-
-        # from modeling import dot_product_attention, attention_ffn_block
-        #
-        # encoding_dim = 256
-        # question_mask = tf.cast(
-        #     tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-        # passage_mask = tf.cast(segment_ids, tf.float32)
-        #
-        # encoded_question = output * tf.expand_dims(question_mask, 2)
-        # encoded_passage = output * tf.expand_dims(passage_mask, 2)
-        #
-        # q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-        # p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-        #
-        # output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
-
-        # from tcn.tcnbk import TemporalConvNet
-        #
-        # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
-        #                          use_highway=False)
-        from tcn.tcn import TCN
-        from tensorflow.keras.layers import Conv1D, SeparableConv1D, Activation, BatchNormalization, LayerNormalization
-        downsample_rate = 2048 / 4096
-        bottleneck_rate = 512 / 1024
-
-        partial_attention_model = tf.keras.Sequential([
-            # Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
-            #        kernel_size=1,
-            #        strides=1,
-            #        padding="same",
-            #        name=f"downsample_layer_1",
-            #        kernel_initializer=modeling.create_initializer()),
-            # BatchNormalization(),
-            # Activation("relu"),
-            # Conv1D(filters=int(albert_config.hidden_size * 0.25),
-            #        kernel_size=1,
-            #        strides=1,
-            #        padding="same",
-            #        name=f"downsample_layer_2",
-            #        kernel_initializer=modeling.create_initializer()),
-            # BatchNormalization(),
-            # Activation("relu"),
-            TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
-                kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
-                use_skip_connections=True,
-                dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
-                kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False),
-            # Conv1D(filters=albert_config.hidden_size,
-            #        kernel_size=1,
-            #        strides=1,
-            #        padding="same",
-            #        name=f"upsample_layer",
-            #        kernel_initializer=modeling.create_initializer()),
-            # BatchNormalization(),
-            # Activation("relu"),
-        ])
-
-        x = partial_attention_model(output)
-        output += x
-        # output = fusion_layer(output, x)
-        print(output.shape)
-
-        # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
-        #                              attention_head_size=768)
+    # with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
+    #     def fusion_layer(x, y):
+    #         with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+    #             z = tf.concat([x, y, x * y, x - y], axis=2)
+    #             gated = tf.layers.dense(z, 1,
+    #                                     activation=tf.nn.sigmoid,
+    #                                     use_bias=True,
+    #                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #             fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                      activation=tf.nn.tanh,
+    #                                      use_bias=True,
+    #                                      kernel_initializer=modeling.create_initializer(
+    #                                          albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     # from modeling import dot_product_attention, attention_ffn_block
+    #     #
+    #     # encoding_dim = 256
+    #     # question_mask = tf.cast(
+    #     #     tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     # passage_mask = tf.cast(segment_ids, tf.float32)
+    #     #
+    #     # encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     # encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #     #
+    #     # q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #     # p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     #
+    #     # output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
+    #
+    #     # from tcn.tcnbk import TemporalConvNet
+    #     #
+    #     # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
+    #     #                          use_highway=False)
+    #     from tcn.tcn import TCN
+    #     from tensorflow.keras.layers import Conv1D, SeparableConv1D, Activation, BatchNormalization, LayerNormalization
+    #     downsample_rate = 2048 / 4096
+    #     bottleneck_rate = 512 / 1024
+    #
+    #     partial_attention_model = tf.keras.Sequential([
+    #         # Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"downsample_layer_1",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #         # Conv1D(filters=int(albert_config.hidden_size * 0.25),
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"downsample_layer_2",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #         TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
+    #             kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
+    #             use_skip_connections=True,
+    #             dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
+    #             kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False),
+    #         # Conv1D(filters=albert_config.hidden_size,
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"upsample_layer",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #     ])
+    #
+    #     x = partial_attention_model(output)
+    #     output += x
+    #     # output = fusion_layer(output, x)
+    #     print(output.shape)
+    #
+    #     # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
+    #     #                              attention_head_size=768)
 
     # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
     #
@@ -2213,16 +2215,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # global_step = tf.train.get_global_step()
             # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
-            # start_loss = focal_loss(
-            #     outputs["start_probs"], features["start_positions"])
-            # end_loss = focal_loss(
-            #     outputs["end_probs"], features["end_positions"])
-
-            total_loss = (start_loss + end_loss) * 0.5
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+            # # start_loss = focal_loss(
+            # #     outputs["start_probs"], features["start_positions"])
+            # # end_loss = focal_loss(
+            # #     outputs["end_probs"], features["end_positions"])
+            #
+            # total_loss = (start_loss + end_loss) * 0.5
 
             # loss_ce = (start_loss + end_loss) * 0.5
 
@@ -2284,150 +2286,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     logits[project_layers_num - 2 - _i] = tf.stack([start_logits_masked, end_logits_masked], axis=-1)
                 return logits
 
-            def adversarial_training_loss(raw_loss, outputs, features, adv_eps=0.02):
-
-                output = outputs["sequence_output"]
-                mask = tf.cast(features["input_mask"], tf.float32)
-                p_mask = outputs["p_mask"]
-                bsz = tf.shape(output)[0]
-
-                raw_perturb = tf.gradients(raw_loss, output)[0]
-                print("raw_perturb_shape", raw_perturb.shape)
-                perturb = adv_eps * tf.stop_gradient(
-                    tf.nn.l2_normalize(raw_perturb * tf.expand_dims(mask, axis=-1), dim=[0, 1, 2]))
-                print(perturb.shape)
-                output += perturb
-
-                output = tf.transpose(output, [1, 0, 2])
-
-                # logit of the start position
-                with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
-                    start_logits = tf.layers.dense(
-                        output,
-                        1,
-                        kernel_initializer=modeling.create_initializer(
-                            albert_config.initializer_range))
-                    start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
-                    start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
-                    start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
-
-                # logit of the end position
-                with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
-                    if is_training:
-                        # during training, compute the end logits based on the
-                        # ground truth of the start position
-                        start_positions = tf.reshape(features["start_positions"], [-1])
-                        start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                                 dtype=tf.float32)
-                        start_features = tf.einsum("lbh,bl->bh", output, start_index)
-                        start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
-                        end_logits = tf.layers.dense(
-                            tf.concat([output, start_features], axis=-1),
-                            albert_config.hidden_size,
-                            kernel_initializer=modeling.create_initializer(
-                                albert_config.initializer_range),
-                            activation=tf.tanh,
-                            name="dense_0")
-                        end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-
-                        end_logits = tf.layers.dense(
-                            end_logits,
-                            1,
-                            kernel_initializer=modeling.create_initializer(
-                                albert_config.initializer_range),
-                            name="dense_1")
-                        end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
-                        end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
-                        end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-                    else:
-                        # during inference, compute the end logits based on beam search
-
-                        start_top_log_probs, start_top_index = tf.nn.top_k(
-                            start_log_probs, k=start_n_top)
-                        start_index = tf.one_hot(start_top_index,
-                                                 depth=max_seq_length, axis=-1, dtype=tf.float32)
-                        start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
-                        end_input = tf.tile(output[:, :, None],
-                                            [1, 1, start_n_top, 1])
-                        start_features = tf.tile(start_features[None],
-                                                 [max_seq_length, 1, 1, 1])
-                        end_input = tf.concat([end_input, start_features], axis=-1)
-                        end_logits = tf.layers.dense(
-                            end_input,
-                            albert_config.hidden_size,
-                            kernel_initializer=modeling.create_initializer(
-                                albert_config.initializer_range),
-                            activation=tf.tanh,
-                            name="dense_0")
-                        end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-                        end_logits = tf.layers.dense(
-                            end_logits,
-                            1,
-                            kernel_initializer=modeling.create_initializer(
-                                albert_config.initializer_range),
-                            name="dense_1")
-                        end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
-                        end_logits = tf.transpose(end_logits, [1, 2, 0])
-                        end_logits_masked = end_logits * (
-                                1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
-                        end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-                        end_top_log_probs, end_top_index = tf.nn.top_k(
-                            end_log_probs, k=end_n_top)
-                        end_top_log_probs = tf.reshape(
-                            end_top_log_probs,
-                            [-1, start_n_top * end_n_top])
-                        end_top_index = tf.reshape(
-                            end_top_index,
-                            [-1, start_n_top * end_n_top])
-
-                # an additional layer to predict answerability
-                with tf.variable_scope("answer_class", reuse=tf.AUTO_REUSE):
-                    # get the representation of CLS
-                    cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
-                                           max_seq_length,
-                                           axis=-1, dtype=tf.float32)
-                    cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
-
-                    # get the representation of START
-                    start_p = tf.nn.softmax(start_logits_masked, axis=-1,
-                                            name="softmax_start")
-                    start_feature = tf.einsum("lbh,bl->bh", output, start_p)
-
-                    # note(zhiliny): no dependency on end_feature so that we can obtain
-                    # one single `cls_logits` for each sample
-                    ans_feature = tf.concat([start_feature, cls_feature], -1)
-                    ans_feature = tf.layers.dense(
-                        ans_feature,
-                        albert_config.hidden_size,
-                        activation=tf.tanh,
-                        kernel_initializer=modeling.create_initializer(
-                            albert_config.initializer_range),
-                        name="dense_0")
-                    ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
-                                                    training=is_training)
-                    cls_logits = tf.layers.dense(
-                        ans_feature,
-                        1,
-                        kernel_initializer=modeling.create_initializer(
-                            albert_config.initializer_range),
-                        name="dense_1",
-                        use_bias=False)
-                    cls_logits = tf.squeeze(cls_logits, -1)
-
-                start_loss = compute_loss(
-                    start_log_probs, features["start_positions"])
-                end_loss = compute_loss(
-                    end_log_probs, features["end_positions"])
-
-                is_impossible = tf.reshape(features["is_impossible"], [-1])
-                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                regression_loss = tf.reduce_mean(regression_loss)
-
-                adv_loss = (start_loss + end_loss + regression_loss) * 0.5
-
-                return adv_loss
-
             # from rl.rl_loss import rl_loss
             # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
             #                   features["end_positions"], sample_num=4)
@@ -2446,16 +2304,75 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
-            cls_logits = outputs["cls_logits"]
-            is_impossible = tf.reshape(features["is_impossible"], [-1])
-            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            # regression_loss = 1/2 * (cls_logits - tf.cast(is_impossible, dtype=tf.float32)) ** 2
-            regression_loss = tf.reduce_mean(regression_loss)
+            # cls_logits = outputs["cls_logits"]
+            # is_impossible = tf.reshape(features["is_impossible"], [-1])
+            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            # # regression_loss = 1/2 * (cls_logits - tf.cast(is_impossible, dtype=tf.float32)) ** 2
+            # regression_loss = tf.reduce_mean(regression_loss)
+            #
+            # # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # # comparable to start_loss and end_loss
+            # total_loss += regression_loss * 0.5
 
-            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
+            def get_loss(outputs_, features_):
+                start_loss = compute_loss(
+                    outputs_["start_log_probs"], features_["start_positions"])
+                end_loss = compute_loss(
+                    outputs_["end_log_probs"], features_["end_positions"])
+
+                total_loss = (start_loss + end_loss) * 0.5
+
+                cls_logits = outputs["cls_logits"]
+                is_impossible = tf.reshape(features["is_impossible"], [-1])
+                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+                regression_loss = tf.reduce_mean(regression_loss)
+
+                # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+                # comparable to start_loss and end_loss
+                total_loss += regression_loss * 0.5
+                return total_loss
+
+            total_loss = get_loss(outputs, features)
+
+            # Adds gradient to embedding and recomputes classification loss.
+            def _scale_l2(x, norm_length):
+                # shape(x) = (batch, num_timesteps, d)
+                # Divide x by max(abs(x)) for a numerically stable L2 norm.
+                # 2norm(x) = a * 2norm(x/a)
+                # Scale over the full sequence, dims (1, 2)
+                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                l2_norm = alpha * tf.sqrt(
+                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                x_unit = x / l2_norm
+                return norm_length * x_unit
+
+            grad, = tf.gradients(
+                total_loss,
+                outputs["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
+            embedded_inputs = outputs["word_embedding_output"] + perturb
+            outputs_adv = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=embedded_inputs)
+
+            adv_loss = get_loss(outputs_adv, features)
+            with tf.control_dependencies([total_loss]):
+                adv_loss = tf.identity(adv_loss)
+            total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             # with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
             #     _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
