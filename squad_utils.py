@@ -1631,8 +1631,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         ])
 
         x = partial_attention_model(output)
-        # output += x
-        output = fusion_layer(output, x)
+        output += x
+        # output = fusion_layer(output, x)
         print(output.shape)
 
         # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
