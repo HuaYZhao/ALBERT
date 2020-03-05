@@ -1582,8 +1582,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         #                          use_highway=False)
         from tcn.tcn import TCN
         from tensorflow.keras.layers import Conv1D, SeparableConv1D, Activation, BatchNormalization, LayerNormalization
-        downsample_rate = 1024 / 4096
-        bottleneck_rate = 256 / 1024
+        downsample_rate = 2048 / 4096
+        bottleneck_rate = 512 / 1024
 
         partial_attention_model = tf.keras.Sequential([
             Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
