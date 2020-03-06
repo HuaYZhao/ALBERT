@@ -227,7 +227,7 @@ class AlbertModel(tf.keras.layers.Layer):
         input_mask = unpacked_inputs[1]
         input_type_ids = unpacked_inputs[2]
         embedded_inputs = kwargs.get("embedded_inputs", None)
-        word_embeddings = embedded_inputs or self.embedding_lookup(input_word_ids)
+        word_embeddings = self.embedding_lookup(input_word_ids) if embedded_inputs is None else embedded_inputs
         embedding_tensor = self.embedding_postprocessor(
             word_embeddings=word_embeddings, token_type_ids=input_type_ids)
         if self.float_type == tf.float16:
