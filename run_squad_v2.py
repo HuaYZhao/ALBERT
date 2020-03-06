@@ -219,8 +219,8 @@ def validate_flags_or_throw(albert_config):
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
-
-    albert_config = modeling.AlbertConfig.from_json_file(FLAGS.albert_config_file)
+    import albert
+    albert_config = albert.AlbertConfig.from_json_file(FLAGS.albert_config_file)
 
     validate_flags_or_throw(albert_config)
 
