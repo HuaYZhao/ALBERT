@@ -1630,7 +1630,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         #     dropout_prob=dropout_prob,
         #     hub_module=hub_module)
         squad_model = ALBertQAModel(
-            albert_config, max_seq_length, None, start_n_top, end_n_top, dropout_prob)
+            albert_config, max_seq_length, init_checkpoint, start_n_top, end_n_top, dropout_prob)
 
         outputs = squad_model(inputs=features, training=is_training)
 
