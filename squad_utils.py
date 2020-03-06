@@ -1632,13 +1632,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         squad_model = ALBertQAModel(
             albert_config, max_seq_length, None, start_n_top, end_n_top, dropout_prob)
 
-        outputs = squad_model(
-            training=is_training,
-            input_ids=input_ids,
-            input_mask=input_mask,
-            segment_ids=segment_ids,
-            p_mask=p_mask,
-            start_positions=features.get("start_positions", None))
+        outputs = squad_model(inputs=features, training=is_training)
 
         tvars = tf.trainable_variables()
 
