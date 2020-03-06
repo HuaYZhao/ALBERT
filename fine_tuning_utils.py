@@ -55,7 +55,8 @@ def _create_model_from_scratch(albert_config, is_training, input_ids,
         token_type_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=use_einsum,
-        embedded_inputs=embedded_inputs)
+        embedded_inputs=embedded_inputs,
+        scope="bert")
     return (model.get_pooled_output(), model.get_sequence_output(),
             model.get_all_encoder_layers(), model.get_word_embedding_output())
 

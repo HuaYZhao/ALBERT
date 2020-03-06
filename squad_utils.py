@@ -1457,7 +1457,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=True,
         hub_module=hub_module,
-        embedded_inputs=embedded_inputs)
+        embedded_inputs=embedded_inputs,
+        )
 
     bsz = tf.shape(output)[0]
     seq_length = modeling.get_shape_list(output)[1]

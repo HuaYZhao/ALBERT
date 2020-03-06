@@ -194,7 +194,7 @@ class AlbertModel(object):
         if token_type_ids is None:
             token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
-        with tf.variable_scope(scope, default_name="bert"):
+        with tf.variable_scope(scope, default_name="bert", reuse=tf.AUTO_REUSE):
             with tf.variable_scope("embeddings"):
                 if embedded_inputs is not None:
                     self.word_embedding_output = tf.identity(embedded_inputs)
