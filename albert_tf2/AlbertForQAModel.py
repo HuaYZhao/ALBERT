@@ -97,7 +97,7 @@ class ALBertQALayer(tf.keras.layers.Layer):
         """Implements call() for the layer."""
         unpacked_inputs = tf_utils.unpack_inputs(inputs)
         sequence_output = unpacked_inputs[0]
-        p_mask = unpacked_inputs[1]
+        p_mask = tf.cast(unpacked_inputs[1], tf.float32)
         start_positions = unpacked_inputs[2]
         is_training = kwargs.get("training", False)
         return_dict = dict()
@@ -203,20 +203,20 @@ class ALBertQAModel(tf.keras.Model):
             stddev=self.albert_config.initializer_range)
         float_type = tf.float32
 
-        input_word_ids = tf.keras.layers.Input(
-            shape=(max_seq_length,), dtype=tf.int32, name='input_word_ids')
-        input_mask = tf.keras.layers.Input(
-            shape=(max_seq_length,), dtype=tf.int32, name='input_mask')
-        input_type_ids = tf.keras.layers.Input(
-            shape=(max_seq_length,), dtype=tf.int32, name='input_type_ids')
+        # input_word_ids = tf.keras.layers.Input(
+        #     shape=(max_seq_length,), dtype=tf.int32, name='input_word_ids')
+        # input_mask = tf.keras.layers.Input(
+        #     shape=(max_seq_length,), dtype=tf.int32, name='input_mask')
+        # input_type_ids = tf.keras.layers.Input(
+        #     shape=(max_seq_length,), dtype=tf.int32, name='input_type_ids')
 
-        albert_layer = AlbertModel(config=albert_config, float_type=float_type)
+        self.albert_layer = AlbertModel(config=albert_config, float_type=float_type)
 
-        _, sequence_output = albert_layer(
-            input_word_ids, input_mask, input_type_ids)
+        # _, sequence_output = albert_layer(
+        #     input_word_ids, input_mask, input_type_ids)
 
-        self.albert_model = tf.keras.Model(inputs=[input_word_ids, input_mask, input_type_ids],
-                                           outputs=[sequence_output])
+        # self.albert_model = tf.keras.Model(inputs=[input_word_ids, input_mask, input_type_ids],
+        #                                    outputs=[sequence_output])
         if init_checkpoint != None:
             self.albert_model.load_weights(init_checkpoint)
 
@@ -233,8 +233,7 @@ class ALBertQAModel(tf.keras.Model):
             start_positions = inputs["start_positions"]
         else:
             start_positions = None
-        sequence_output = self.albert_model(
-            [input_word_ids, input_mask, segment_ids], **kwargs)
+        _, sequence_output = self.albert_layer(input_word_ids, input_mask, segment_ids)
         outputs = self.qalayer(
             sequence_output, p_mask, start_positions, **kwargs)
         return outputs
