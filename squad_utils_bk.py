@@ -1443,29 +1443,22 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
     return all_predictions, scores_diff_json
 
 
-def create_v2_model(albert_model, albert_config, is_training, input_ids, input_mask,
+def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module, embedded_inputs=None):
     """Creates a classification model."""
-    # (pool_output, output, all_encoder_layers, word_embedding_output) = fine_tuning_utils.create_albert(
-    #     albert_config=albert_config,
-    #     is_training=is_training,
-    #     input_ids=input_ids,
-    #     input_mask=input_mask,
-    #     segment_ids=segment_ids,
-    #     use_one_hot_embeddings=use_one_hot_embeddings,
-    #     use_einsum=True,
-    #     hub_module=hub_module,
-    #     embedded_inputs=embedded_inputs,
-    #     )
-    (pool_output, output, all_encoder_layers, word_embedding_output) = albert_model.forward(
+    (pool_output, output, all_encoder_layers, word_embedding_output) = fine_tuning_utils.create_albert(
+        albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
         input_mask=input_mask,
-        token_type_ids=segment_ids,
+        segment_ids=segment_ids,
+        use_one_hot_embeddings=use_one_hot_embeddings,
+        use_einsum=True,
+        hub_module=hub_module,
         embedded_inputs=embedded_inputs,
-    )
+        )
 
     bsz = tf.shape(output)[0]
     seq_length = modeling.get_shape_list(output)[1]
@@ -2035,10 +2028,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        albert_model = modeling.AlbertModel(albert_config, use_one_hot_embeddings, scope="bert")
-
         outputs = create_v2_model(
-            albert_model=albert_model,
             albert_config=albert_config,
             is_training=is_training,
             input_ids=input_ids,
@@ -2366,7 +2356,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
             embedded_inputs = outputs["word_embedding_output"] + perturb
             outputs_adv = create_v2_model(
-                albert_model=albert_model,
                 albert_config=albert_config,
                 is_training=is_training,
                 input_ids=input_ids,
@@ -2382,9 +2371,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 embedded_inputs=embedded_inputs)
 
             adv_loss = get_loss(outputs_adv, features)
-            with tf.control_dependencies([total_loss]):
-                adv_loss = tf.identity(adv_loss)
-            total_loss = total_loss * 0.875 + adv_loss * 0.125
+
+            # total_loss = total_loss * 0.875 + adv_loss * 0.125
+            total_loss = adv_loss
 
             # with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
             #     _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
