@@ -152,14 +152,9 @@ class AlbertModel(object):
 
     def __init__(self,
                  config,
-                 is_training,
-                 input_ids,
-                 input_mask=None,
-                 token_type_ids=None,
                  use_one_hot_embeddings=False,
                  use_einsum=True,
-                 scope=None,
-                 embedded_inputs=None):
+                 scope=None, ):
         """Constructor for AlbertModel.
 
         Args:
@@ -179,68 +174,89 @@ class AlbertModel(object):
           ValueError: The config is invalid or one of the input tensor shapes
             is invalid.
         """
-        config = copy.deepcopy(config)
-        if not is_training:
-            config.hidden_dropout_prob = 0.0
-            config.attention_probs_dropout_prob = 0.0
+        self.config = copy.deepcopy(config)
 
-        input_shape = get_shape_list(input_ids, expected_rank=2)
+        self.use_one_hot_embeddings = use_one_hot_embeddings
+        self.use_einsum = use_einsum
+        self.scope = scope
+
+    def forward(self,
+                input_ids,
+                input_mask=None,
+                token_type_ids=None,
+                is_training=False,
+                embedded_inputs=None):
+        self.input_ids = input_ids
+        self.input_mask = input_mask
+        self.token_type_ids = token_type_ids
+        self.is_training = is_training
+        self.embedded_inputs = embedded_inputs
+
+        if not self.is_training:
+            self.config.hidden_dropout_prob = 0.0
+            self.config.attention_probs_dropout_prob = 0.0
+
+        input_shape = get_shape_list(self.input_ids, expected_rank=2)
         batch_size = input_shape[0]
         seq_length = input_shape[1]
 
-        if input_mask is None:
+        if self.input_mask is None:
             input_mask = tf.ones(shape=[batch_size, seq_length], dtype=tf.int32)
 
-        if token_type_ids is None:
+        if self.token_type_ids is None:
             token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
-        with tf.variable_scope(scope, default_name="bert", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(self.scope, default_name="bert", reuse=tf.AUTO_REUSE):
             with tf.variable_scope("embeddings"):
-                if embedded_inputs is not None:
-                    self.word_embedding_output = tf.identity(embedded_inputs)
+                if self.embedded_inputs is not None:
+                    self.embedding_output -= self.word_embedding_output
+                    self.embedding_output += self.embedded_inputs
+                    # self.word_embedding_output = tf.identity(self.embedded_inputs)
+
                 else:
                     # Perform embedding lookup on the word ids.
                     (self.word_embedding_output,
                      self.output_embedding_table) = embedding_lookup(
-                        input_ids=input_ids,
-                        vocab_size=config.vocab_size,
-                        embedding_size=config.embedding_size,
-                        initializer_range=config.initializer_range,
+                        input_ids=self.input_ids,
+                        vocab_size=self.config.vocab_size,
+                        embedding_size=self.config.embedding_size,
+                        initializer_range=self.config.initializer_range,
                         word_embedding_name="word_embeddings",
-                        use_one_hot_embeddings=use_one_hot_embeddings)
+                        use_one_hot_embeddings=self.use_one_hot_embeddings)
 
-                # Add positional embeddings and token type embeddings, then layer
-                # normalize and perform dropout.
-                self.embedding_output = embedding_postprocessor(
-                    input_tensor=self.word_embedding_output,
-                    use_token_type=True,
-                    token_type_ids=token_type_ids,
-                    token_type_vocab_size=config.type_vocab_size,
-                    token_type_embedding_name="token_type_embeddings",
-                    use_position_embeddings=True,
-                    position_embedding_name="position_embeddings",
-                    initializer_range=config.initializer_range,
-                    max_position_embeddings=config.max_position_embeddings,
-                    dropout_prob=config.hidden_dropout_prob)
+                    # Add positional embeddings and token type embeddings, then layer
+                    # normalize and perform dropout.
+                    self.embedding_output = embedding_postprocessor(
+                        input_tensor=self.word_embedding_output,
+                        use_token_type=True,
+                        token_type_ids=self.token_type_ids,
+                        token_type_vocab_size=self.config.type_vocab_size,
+                        token_type_embedding_name="token_type_embeddings",
+                        use_position_embeddings=True,
+                        position_embedding_name="position_embeddings",
+                        initializer_range=self.config.initializer_range,
+                        max_position_embeddings=self.config.max_position_embeddings,
+                        dropout_prob=self.config.hidden_dropout_prob)
+                self.embedding_output = layer_norm_and_dropout(self.embedding_output, self.config.hidden_dropout_prob)
 
             with tf.variable_scope("encoder"):
                 # Run the stacked transformer.
                 # `sequence_output` shape = [batch_size, seq_length, hidden_size].
                 self.all_encoder_layers = transformer_model(
                     input_tensor=self.embedding_output,
-                    attention_mask=input_mask,
-                    hidden_size=config.hidden_size,
-                    num_hidden_layers=config.num_hidden_layers,
-                    num_hidden_groups=config.num_hidden_groups,
-                    num_attention_heads=config.num_attention_heads,
-                    intermediate_size=config.intermediate_size,
-                    inner_group_num=config.inner_group_num,
-                    intermediate_act_fn=get_activation(config.hidden_act),
-                    hidden_dropout_prob=config.hidden_dropout_prob,
-                    attention_probs_dropout_prob=config.attention_probs_dropout_prob,
-                    initializer_range=config.initializer_range,
+                    attention_mask=self.input_mask,
+                    hidden_size=self.config.hidden_size,
+                    num_hidden_layers=self.config.num_hidden_layers,
+                    num_hidden_groups=self.config.num_hidden_groups,
+                    num_attention_heads=self.config.num_attention_heads,
+                    intermediate_size=self.config.intermediate_size,
+                    inner_group_num=self.config.inner_group_num,
+                    intermediate_act_fn=get_activation(self.config.hidden_act),
+                    hidden_dropout_prob=self.config.hidden_dropout_prob,
+                    attention_probs_dropout_prob=self.config.attention_probs_dropout_prob,
+                    initializer_range=self.config.initializer_range,
                     do_return_all_layers=True,
-                    use_einsum=use_einsum)
+                    use_einsum=self.use_einsum)
 
             self.sequence_output = self.all_encoder_layers[-1]
             # The "pooler" converts the encoded sequence tensor of shape
@@ -258,6 +274,11 @@ class AlbertModel(object):
                 #     activation=tf.tanh,
                 #     kernel_initializer=create_initializer(config.initializer_range))
                 self.pooled_output = None
+
+        return (self.get_pooled_output(),
+                self.get_sequence_output(),
+                self.get_all_encoder_layers(),
+                self.get_word_embedding_output())
 
     def get_pooled_output(self):
         return self.pooled_output
@@ -629,7 +650,6 @@ def embedding_postprocessor(input_tensor,
                                              position_broadcast_shape)
             output += position_embeddings
 
-    output = layer_norm_and_dropout(output, dropout_prob)
     return output
 
 

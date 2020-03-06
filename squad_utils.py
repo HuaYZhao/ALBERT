@@ -26,7 +26,6 @@ import re
 import string
 import sys
 import fine_tuning_utils
-import albert
 import modeling
 import optimization
 import tokenization
@@ -34,7 +33,7 @@ import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
@@ -1444,162 +1443,12 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
     return all_predictions, scores_diff_json
 
 
-def create_v2_model(albert_config, is_training, input_ids, input_mask,
+def create_v2_model(albert_model, albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                    hub_module):
+                    hub_module, embedded_inputs=None):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
-        albert_config=albert_config,
-        is_training=is_training,
-        input_ids=input_ids,
-        input_mask=input_mask,
-        segment_ids=segment_ids,
-        use_one_hot_embeddings=use_one_hot_embeddings,
-        use_einsum=True,
-        hub_module=hub_module)
-
-    bsz = tf.shape(output)[0]
-    return_dict = {}
-    output = tf.transpose(output, [1, 0, 2])
-
-    # invalid position mask such as query and special symbols (PAD, SEP, CLS)
-    p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
-
-    # logit of the start position
-    with tf.variable_scope("start_logits"):
-        start_logits = tf.layers.dense(
-            output,
-            1,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range))
-        start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
-        start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
-        start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
-
-    # logit of the end position
-    with tf.variable_scope("end_logits"):
-        if is_training:
-            # during training, compute the end logits based on the
-            # ground truth of the start position
-            start_positions = tf.reshape(features["start_positions"], [-1])
-            start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                     dtype=tf.float32)
-            start_features = tf.einsum("lbh,bl->bh", output, start_index)
-            start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
-            end_logits = tf.layers.dense(
-                tf.concat([output, start_features], axis=-1),
-                albert_config.hidden_size,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                activation=tf.tanh,
-                name="dense_0")
-            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-
-            end_logits = tf.layers.dense(
-                end_logits,
-                1,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                name="dense_1")
-            end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
-            end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-        else:
-            # during inference, compute the end logits based on beam search
-
-            start_top_log_probs, start_top_index = tf.nn.top_k(
-                start_log_probs, k=start_n_top)
-            start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=tf.float32)
-            start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
-            end_input = tf.tile(output[:, :, None],
-                                [1, 1, start_n_top, 1])
-            start_features = tf.tile(start_features[None],
-                                     [max_seq_length, 1, 1, 1])
-            end_input = tf.concat([end_input, start_features], axis=-1)
-            end_logits = tf.layers.dense(
-                end_input,
-                albert_config.hidden_size,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                activation=tf.tanh,
-                name="dense_0")
-            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-            end_logits = tf.layers.dense(
-                end_logits,
-                1,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                name="dense_1")
-            end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
-            end_logits = tf.transpose(end_logits, [1, 2, 0])
-            end_logits_masked = end_logits * (
-                    1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-            end_top_log_probs, end_top_index = tf.nn.top_k(
-                end_log_probs, k=end_n_top)
-            end_top_log_probs = tf.reshape(
-                end_top_log_probs,
-                [-1, start_n_top * end_n_top])
-            end_top_index = tf.reshape(
-                end_top_index,
-                [-1, start_n_top * end_n_top])
-
-    if is_training:
-        return_dict["start_log_probs"] = start_log_probs
-        return_dict["end_log_probs"] = end_log_probs
-    else:
-        return_dict["start_top_log_probs"] = start_top_log_probs
-        return_dict["start_top_index"] = start_top_index
-        return_dict["end_top_log_probs"] = end_top_log_probs
-        return_dict["end_top_index"] = end_top_index
-
-    # an additional layer to predict answerability
-    with tf.variable_scope("answer_class"):
-        # get the representation of CLS
-        cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
-                               max_seq_length,
-                               axis=-1, dtype=tf.float32)
-        cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
-
-        # get the representation of START
-        start_p = tf.nn.softmax(start_logits_masked, axis=-1,
-                                name="softmax_start")
-        start_feature = tf.einsum("lbh,bl->bh", output, start_p)
-
-        # note(zhiliny): no dependency on end_feature so that we can obtain
-        # one single `cls_logits` for each sample
-        ans_feature = tf.concat([start_feature, cls_feature], -1)
-        ans_feature = tf.layers.dense(
-            ans_feature,
-            albert_config.hidden_size,
-            activation=tf.tanh,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range),
-            name="dense_0")
-        ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
-                                        training=is_training)
-        cls_logits = tf.layers.dense(
-            ans_feature,
-            1,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range),
-            name="dense_1",
-            use_bias=False)
-        cls_logits = tf.squeeze(cls_logits, -1)
-
-        return_dict["cls_logits"] = cls_logits
-
-    return return_dict
-
-
-def create_v2_model2(albert_layer, albert_config, is_training, input_ids, input_mask,
-                     segment_ids, use_one_hot_embeddings, features,
-                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                     hub_module):
-    """Creates a classification model."""
-    # (_, output) = fine_tuning_utils.create_albert(
+    # (pool_output, output, all_encoder_layers, word_embedding_output) = fine_tuning_utils.create_albert(
     #     albert_config=albert_config,
     #     is_training=is_training,
     #     input_ids=input_ids,
@@ -1607,18 +1456,434 @@ def create_v2_model2(albert_layer, albert_config, is_training, input_ids, input_
     #     segment_ids=segment_ids,
     #     use_one_hot_embeddings=use_one_hot_embeddings,
     #     use_einsum=True,
-    #     hub_module=hub_module)
-    _, output = albert_layer(input_ids, input_ids, segment_ids)
+    #     hub_module=hub_module,
+    #     embedded_inputs=embedded_inputs,
+    #     )
+    (pool_output, output, all_encoder_layers, word_embedding_output) = albert_model.forward(
+        is_training=is_training,
+        input_ids=input_ids,
+        input_mask=input_mask,
+        segment_ids=segment_ids,
+        embedded_inputs=embedded_inputs,
+    )
 
     bsz = tf.shape(output)[0]
+    seq_length = modeling.get_shape_list(output)[1]
+
     return_dict = {}
+    sequence_output = output
+    return_dict["sequence_output"] = output
+    return_dict["pool_output"] = pool_output
+    return_dict["all_encoder_layers"] = all_encoder_layers
+    return_dict["word_embedding_output"] = word_embedding_output
+
+    # with tf.variable_scope("slqa", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+    #             z = tf.concat([x, y, x * y, x - y], axis=2)
+    #             gated = tf.layers.dense(z, 1,
+    #                                     activation=tf.nn.sigmoid,
+    #                                     use_bias=True,
+    #                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #             fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                      activation=tf.nn.tanh,
+    #                                      use_bias=True,
+    #                                      kernel_initializer=modeling.create_initializer(
+    #                                          albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
+    #                      initializer=modeling.create_initializer(albert_config.initializer_range)):
+    #         from layers import CoupledInputForgetGateLSTMCell
+    #         with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
+    #             lstm_cell = {}
+    #             for direction in ["forward", "backward"]:
+    #                 with tf.variable_scope(direction):
+    #                     lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
+    #                         lstm_dim,
+    #                         use_peepholes=True,
+    #                         initializer=initializer,
+    #                         state_is_tuple=True
+    #                     )
+    #             outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
+    #                 lstm_cell["forward"],
+    #                 lstm_cell["backward"],
+    #                 lstm_inputs,
+    #                 dtype=tf.float32,
+    #                 sequence_length=lengths
+    #             )
+    #         return tf.concat(outputs, axis=2), final_states
+    #
+    #     encoding_dim = 256
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #
+    #     s = tf.einsum(" blh, bLh -> blL ", encoded_question, encoded_passage)
+    #     alpha = tf.einsum(" blL, bl -> blL ", tf.nn.softmax(s, axis=1), question_mask)
+    #
+    #     q_aware_p = tf.einsum(" bLl, blh -> bLh ", alpha, encoded_question)
+    #
+    #     beta = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(s, axis=2), passage_mask)
+    #
+    #     p_aware_q = tf.einsum(" bLl, bLh -> blh ", beta, encoded_passage)
+    #
+    #     fused_passage = fusion_layer(encoded_passage, q_aware_p)
+    #
+    #     fused_question = fusion_layer(encoded_question, p_aware_q)
+    #
+    #     self_w = tf.get_variable(name="self_w",
+    #                              shape=[albert_config.hidden_size, albert_config.hidden_size],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_b = tf.get_variable(name="self_b",
+    #                              shape=[max_seq_length],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
+    #     intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+    #     self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, fused_passage)
+    #
+    #     intermediate_p = fusion_layer(fused_passage, self_aware_passage)
+    #     contextual_p = tf.einsum(" bLe, bL -> bLe ",
+    #                              biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer_p")[0],
+    #                              passage_mask)
+    #     intermediate_q = tf.einsum(" ble, bl -> ble ",
+    #                                biLSTM_layer(fused_question, encoding_dim, name="contextual_layer_q")[0],
+    #                                question_mask)
+    #     gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
+    #     contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+    #     project_w = tf.get_variable(name="project_w",
+    #                                 shape=[encoding_dim * 2],
+    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                                 trainable=True)
+    #     output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
+    #     # project_w = tf.get_variable(name="project_w",
+    #     #                             shape=[albert_config.hidden_size, max_seq_length],
+    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                             trainable=True)
+    #     #
+    #     # output = tf.einsum(" bLh, hl, blh -> bLh ", fused_passage, project_w, fused_question)
+
+    # with tf.variable_scope("slqa3", reuse=tf.AUTO_REUSE):
+    #     def fusion_layer(x, y):
+    #         with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+    #             z = tf.concat([x, y, x * y, x - y], axis=2)
+    #             gated = tf.layers.dense(z, 1,
+    #                                     activation=tf.nn.sigmoid,
+    #                                     use_bias=True,
+    #                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #             fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                      activation=tf.nn.tanh,
+    #                                      use_bias=True,
+    #                                      kernel_initializer=modeling.create_initializer(
+    #                                          albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     # from modeling import dot_product_attention, attention_ffn_block
+    #     #
+    #     # encoding_dim = 256
+    #     # question_mask = tf.cast(
+    #     #     tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     # passage_mask = tf.cast(segment_ids, tf.float32)
+    #     #
+    #     # encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     # encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #     #
+    #     # q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #     # p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     #
+    #     # output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
+    #
+    #     # from tcn.tcnbk import TemporalConvNet
+    #     #
+    #     # output = TemporalConvNet(output, [768] * 7, kernel_size=2, dropout=albert_config.hidden_dropout_prob,
+    #     #                          use_highway=False)
+    #     from tcn.tcn import TCN
+    #     from tensorflow.keras.layers import Conv1D, SeparableConv1D, Activation, BatchNormalization, LayerNormalization
+    #     downsample_rate = 2048 / 4096
+    #     bottleneck_rate = 512 / 1024
+    #
+    #     partial_attention_model = tf.keras.Sequential([
+    #         # Conv1D(filters=int(albert_config.hidden_size * downsample_rate),
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"downsample_layer_1",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #         # Conv1D(filters=int(albert_config.hidden_size * 0.25),
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"downsample_layer_2",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #         TCN(nb_filters=int(albert_config.hidden_size * 1.), bottleneck_rate=0.5,
+    #             kernel_size=3, nb_stacks=1, dilations=[1, 2, 4, 8, 16, 32, 64], padding='same',
+    #             use_skip_connections=True,
+    #             dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='linear',
+    #             kernel_initializer="he_normal", use_batch_norm=True, use_layer_norm=False),
+    #         # Conv1D(filters=albert_config.hidden_size,
+    #         #        kernel_size=1,
+    #         #        strides=1,
+    #         #        padding="same",
+    #         #        name=f"upsample_layer",
+    #         #        kernel_initializer=modeling.create_initializer()),
+    #         # BatchNormalization(),
+    #         # Activation("relu"),
+    #     ])
+    #
+    #     x = partial_attention_model(output)
+    #     output += x
+    #     # output = fusion_layer(output, x)
+    #     print(output.shape)
+    #
+    #     # output = attention_ffn_block(contextual_passage, hidden_size=768, attention_mask=passage_mask,
+    #     #                              attention_head_size=768)
+
+    # with tf.variable_scope("co-attention", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         z = tf.concat([x, y, x * y, x - y], axis=2)
+    #         gated = tf.layers.dense(z, 1,
+    #                                 activation=tf.nn.sigmoid,
+    #                                 use_bias=True,
+    #                                 kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         fusion = tf.layers.dense(z, albert_config.hidden_size,
+    #                                  activation=tf.nn.tanh,
+    #                                  use_bias=True,
+    #                                  kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     encoded_question = output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = output * tf.expand_dims(passage_mask, 2)
+    #
+    #     from modeling import dot_product_attention, attention_ffn_block
+    #     import sys
+    #
+    #     q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #
+    #     self_att_p = tf.einsum(" blh, bLh -> blL ", q_aware_passage, q_aware_passage)
+    #     intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+    #     self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
+    #
+    #     intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+    #     contextual_p = attention_ffn_block(intermediate_p, hidden_size=768, attention_head_size=768,
+    #                                        attention_mask=passage_mask)  # [bs, seq_len, hidden]
+    #
+    #     intermediate_q = attention_ffn_block(p_aware_question, hidden_size=768, attention_head_size=768,
+    #                                          attention_mask=question_mask)
+    #     gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1),
+    #                        2) * question_mask  # [bs, q_l]
+    #     contextual_q = tf.einsum(" bl, ble -> ble ", gamma, intermediate_q)
+    #
+    #     output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
+
+    # with tf.variable_scope("slqa2", reuse=tf.AUTO_REUSE):
+    #
+    #     def fusion_layer(x, y):
+    #         with tf.variable_scope("fusion", reuse=tf.AUTO_REUSE):
+    #             z = tf.concat([x, y, x * y, x - y], axis=2)
+    #             gated = tf.layers.dense(z, 1,
+    #                                     activation=tf.nn.sigmoid,
+    #                                     use_bias=True,
+    #                                     kernel_initializer=modeling.create_initializer(albert_config.initializer_range))
+    #             fusion = tf.layers.dense(z, 384,
+    #                                      activation=tf.nn.tanh,
+    #                                      use_bias=True,
+    #                                      kernel_initializer=modeling.create_initializer(
+    #                                          albert_config.initializer_range))
+    #         return gated * fusion + (1 - gated) * x
+    #
+    #     def biLSTM_layer(lstm_inputs, lstm_dim, lengths=None, name=None,
+    #                      initializer=modeling.create_initializer(albert_config.initializer_range)):
+    #         from layers import CoupledInputForgetGateLSTMCell
+    #         with tf.variable_scope("char_BiLSTM" if not name else name, reuse=tf.AUTO_REUSE):
+    #             lstm_cell = {}
+    #             for direction in ["forward", "backward"]:
+    #                 with tf.variable_scope(direction):
+    #                     lstm_cell[direction] = CoupledInputForgetGateLSTMCell(
+    #                         lstm_dim,
+    #                         use_peepholes=True,
+    #                         initializer=initializer,
+    #                         state_is_tuple=True
+    #                     )
+    #             outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
+    #                 lstm_cell["forward"],
+    #                 lstm_cell["backward"],
+    #                 lstm_inputs,
+    #                 dtype=tf.float32,
+    #                 sequence_length=lengths
+    #             )
+    #         return tf.concat(outputs, axis=2), final_states
+    #
+    #     def IDCNN_layer(model_inputs, name=None):
+    #         """
+    #         :param idcnn_inputs: [batch_size, num_steps, emb_size]
+    #         :return: [batch_size, num_steps, cnn_output_width]
+    #         """
+    #         from layers import casual_dilated_conv
+    #         layers = [
+    #             {
+    #                 'dilation': 1
+    #             },
+    #             {
+    #                 'dilation': 2
+    #             },
+    #             {
+    #                 'dilation': 4
+    #             },
+    #             {
+    #                 'dilation': 8
+    #             },
+    #             {
+    #                 'dilation': 16
+    #             },
+    #         ]
+    #         filter_width = 3
+    #         num_filter = 384
+    #         repeat_times = 1
+    #
+    #         model_inputs = tf.expand_dims(model_inputs, 1)
+    #         with tf.variable_scope("idcnn" if not name else name, reuse=tf.AUTO_REUSE):
+    #             shape = [1, filter_width, albert_config.hidden_size,
+    #                      num_filter]
+    #             print(shape)
+    #             filter_weights = tf.get_variable(
+    #                 "idcnn_filter",
+    #                 shape=shape,
+    #                 initializer=modeling.create_initializer())
+    #
+    #             """
+    #             shape of input = [batch, in_height, in_width, in_channels]
+    #             shape of filter = [filter_height, filter_width, in_channels, out_channels]
+    #             """
+    #             layerInput = tf.nn.conv2d(model_inputs,
+    #                                       filter_weights,
+    #                                       strides=[1, 1, 1, 1],
+    #                                       padding="SAME",
+    #                                       name="init_layer")
+    #             finalOutFromLayers = []
+    #             totalWidthForLastDim = 0
+    #             for j in range(repeat_times):
+    #                 for i in range(len(layers)):
+    #                     dilation = layers[i]['dilation']
+    #                     isLast = True if i == (len(layers) - 1) else False
+    #                     # with tf.variable_scope("atrous-conv-layer-%d" % i,
+    #                     #                        reuse=tf.AUTO_REUSE):
+    #                     with tf.variable_scope("atrous-conv-layer",
+    #                                            reuse=tf.AUTO_REUSE):
+    #                         w = tf.get_variable(
+    #                             "filterW",
+    #                             shape=[1, filter_width, num_filter, num_filter],
+    #                             initializer=tf.contrib.layers.xavier_initializer())
+    #                         b = tf.get_variable("filterB", shape=[num_filter])
+    #                         conv = casual_dilated_conv(layerInput,
+    #                                                    filters=w,
+    #                                                    rate=dilation,
+    #                                                    padding="SAME")
+    #                         # conv = tf.nn.atrous_conv2d(layerInput,
+    #                         # w,
+    #                         #                          dilations=dilation,
+    #                         #                          padding="SAME")
+    #                         conv = tf.nn.bias_add(conv, b)
+    #                         conv = tf.nn.relu(conv)
+    #                         if isLast:
+    #                             finalOutFromLayers.append(conv)
+    #                             totalWidthForLastDim += num_filter
+    #                         layerInput = conv
+    #             # 只取最后一层
+    #             # finalOut = tf.concat(axis=3, values=finalOutFromLayers)
+    #             finalOut = finalOutFromLayers[-1]
+    #             from modeling import dropout
+    #             finalOut = dropout(finalOut, albert_config.hidden_dropout_prob)
+    #
+    #             finalOut = tf.squeeze(finalOut, [1])
+    #             # finalOut = tf.reshape(finalOut, [-1, totalWidthForLastDim])
+    #             print("finalOut_shape", finalOut.shape)
+    #             return finalOut
+    #
+    #     encoding_dim = 256
+    #     question_mask = tf.cast(
+    #         tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+    #     passage_mask = tf.cast(segment_ids, tf.float32)
+    #
+    #     # refine_output = IDCNN_layer(output)
+    #     # filter_weights = tf.get_variable(
+    #     #     "idcnn_filter",
+    #     #     shape=[3, albert_config.hidden_size, 384],
+    #     #     initializer=modeling.create_initializer())
+    #     refine_output = IDCNN_layer(output)
+    #
+    #     encoded_question = refine_output * tf.expand_dims(question_mask, 2)
+    #     encoded_passage = refine_output * tf.expand_dims(passage_mask, 2)
+    #
+    #     from modeling import dot_product_attention
+    #     q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+    #     p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+    #
+    #     self_w = tf.get_variable(name="self_w",
+    #                              shape=[384, 384],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_b = tf.get_variable(name="self_b",
+    #                              shape=[max_seq_length],
+    #                              initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                              trainable=True)
+    #     self_att_p = tf.einsum(" blh, hH, bLH -> blL ", encoded_passage, self_w, encoded_passage) + self_b
+    #     intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
+    #     self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
+    #
+    #     intermediate_p = fusion_layer(q_aware_passage, self_aware_passage)
+    #     # intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
+    #
+    #     contextual_p = tf.einsum(" bLe, bL -> bLe ",
+    #                              biLSTM_layer(intermediate_p, encoding_dim, name="contextual_layer")[0],
+    #                              passage_mask)
+    #     intermediate_q = tf.einsum(" ble, bl -> ble ",
+    #                                biLSTM_layer(p_aware_question, encoding_dim, name="contextual_layer")[0],
+    #                                question_mask)
+    #     gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1), 2) * question_mask
+    #     contextual_q = tf.einsum(" bl, ble -> be ", gamma, intermediate_q)
+    #     project_w = tf.get_variable(name="project_w",
+    #                                 shape=[encoding_dim * 2],
+    #                                 initializer=modeling.create_initializer(albert_config.initializer_range),
+    #                                 trainable=True)
+    #     output = tf.einsum(" bLe,e,be -> bLe", contextual_p, project_w, contextual_q, name="slqa_output")
+    #     # project_w = tf.get_variable(name="project_w",
+    #     #                             shape=[384, max_seq_length],
+    #     #                             initializer=modeling.create_initializer(albert_config.initializer_range),
+    #     #                             trainable=True)
+    #
+    #     # output = tf.einsum(" bLh, hl, blh -> bLh ", q_aware_passage, project_w, p_aware_question)
+
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
+    # from rl.decoder import decode
+    #
+    # iter_logits = decode(sequence_output, tf.fill([bsz], seq_length),
+    #                      state_size=albert_config.hidden_size, keep_prob=1 - dropout_prob, loop=1)
+    #
+    # final_logits = iter_logits.read(0)
+    # output = tf.transpose(final_logits, [1, 0, 2])
+
     # logit of the start position
-    with tf.variable_scope("start_logits"):
+    with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
         start_logits = tf.layers.dense(
             output,
             1,
@@ -1629,7 +1894,7 @@ def create_v2_model2(albert_layer, albert_config, is_training, input_ids, input_
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
     # logit of the end position
-    with tf.variable_scope("end_logits"):
+    with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
         if is_training:
             # during training, compute the end logits based on the
             # ground truth of the start position
@@ -1698,8 +1963,13 @@ def create_v2_model2(albert_layer, albert_config, is_training, input_ids, input_
                 [-1, start_n_top * end_n_top])
 
     if is_training:
+        return_dict["start_logits"] = start_logits_masked
+        return_dict["start_probs"] = tf.nn.softmax(start_logits_masked, -1)
         return_dict["start_log_probs"] = start_log_probs
+        return_dict["end_logits"] = end_logits_masked
+        return_dict["end_probs"] = tf.nn.softmax(end_logits_masked, -1)
         return_dict["end_log_probs"] = end_log_probs
+        return_dict["p_mask"] = p_mask
     else:
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
@@ -1707,7 +1977,7 @@ def create_v2_model2(albert_layer, albert_config, is_training, input_ids, input_
         return_dict["end_top_index"] = end_top_index
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class"):
+    with tf.variable_scope("answer_class", reuse=tf.AUTO_REUSE):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
@@ -1765,10 +2035,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        albert_model = albert.get_albert_model(input_ids, input_mask, segment_ids, config=albert_config)
+        albert_model = modeling.AlbertModel(albert_config, use_one_hot_embeddings)
 
-        outputs = create_v2_model2(
-            albert_layer=albert_model,
+        outputs = create_v2_model(
+            albert_model=albert_model,
             albert_config=albert_config,
             is_training=is_training,
             input_ids=input_ids,
@@ -1809,6 +2079,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
+            batch_size = modeling.get_shape_list(input_ids)[0]
             seq_length = modeling.get_shape_list(input_ids)[1]
 
             def compute_loss(log_probs, positions):
@@ -1819,24 +2090,327 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(loss)
                 return loss
 
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
+            def compute_sn_loss(log_probs, positions):
+                def exp_mask(val, mask):
+                    mask = tf.cast(mask, tf.float32)
+                    return val * mask + (1 - mask) * -1e30
 
-            total_loss = (start_loss + end_loss) * 0.5
+                masked_log_probs = exp_mask(log_probs, input_mask)
+                group_norms = tf.reduce_logsumexp(masked_log_probs, axis=1)
+                answer_mask = tf.one_hot(positions, depth=seq_length)
+                log_score = tf.reduce_logsumexp(masked_log_probs - 1e30 * (1 - answer_mask), axis=1)
+                loss = tf.reduce_mean(-(log_score - group_norms))
+                return loss
 
-            cls_logits = outputs["cls_logits"]
-            is_impossible = tf.reshape(features["is_impossible"], [-1])
-            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            regression_loss = tf.reduce_mean(regression_loss)
+            def compute_crf_loss(sequence_output, start_positions, end_positions):
+                """
+                compute crf loss
+                label: 0=O, 1=B, 2=I, 3=E, 4=S
+                """
+                sequence_label = tf.zeros([batch_size, seq_length], dtype=tf.int32)
+                basic_ones = tf.ones([batch_size, seq_length], dtype=tf.int32)
+                start_y = tf.one_hot(start_positions, depth=seq_length, dtype=tf.int32)
+                end_y = tf.one_hot(end_positions, depth=seq_length, dtype=tf.int32)
+                sequence_label += start_y * basic_ones * 1 + end_y * basic_ones * 3
+                idxes = tf.tile(tf.expand_dims(tf.range(seq_length), 0), [batch_size, 1])
+                sequence_label = tf.where(
+                    tf.logical_and(idxes > tf.tile(tf.expand_dims(start_positions, 1), [1, seq_length])
+                                   , idxes < tf.tile(tf.expand_dims(end_positions, 1), [1, seq_length])),
+                    basic_ones * 2,
+                    sequence_label)
 
-            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
+                crf_logits = tf.layers.dense(
+                    sequence_output,
+                    5,
+                    kernel_initializer=modeling.create_initializer(
+                        albert_config.initializer_range))
+                loss, _ = tf.contrib.crf.crf_log_likelihood(inputs=crf_logits,
+                                                            tag_indices=sequence_label,
+                                                            sequence_lengths=tf.fill([batch_size], seq_length))
+                return -tf.reduce_mean(loss)
+
+            def focal_loss(pred, y, alpha=0.75, gamma=2):
+                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
+
+                zeros = tf.zeros_like(pred, dtype=pred.dtype)
+
+                # For positive prediction, only need consider front part loss, back part is 0;
+                # target_tensor > zeros <=> z=1, so positive coefficient = z - p.
+                pos_p_sub = tf.where(y > zeros, y - pred, zeros)  # positive sample 寻找正样本，并进行填充
+
+                # For negative prediction, only need consider back part loss, front part is 0;
+                # target_tensor > zeros <=> z=1, so negative coefficient = 0.
+                neg_p_sub = tf.where(y > zeros, zeros, pred)  # negative sample 寻找负样本，并进行填充
+                per_entry_cross_ent = - alpha * tf.pow(pos_p_sub, gamma) * tf.log(tf.clip_by_value(pred, 1e-30, 1.0)) \
+                                      - (1 - alpha) * tf.pow(neg_p_sub, gamma) * tf.log(
+                    tf.clip_by_value(1.0 - pred, 1e-30, 1.0))
+
+                loss = tf.reduce_mean(tf.reduce_sum(per_entry_cross_ent, axis=-1))
+                return loss
+
+            def focal_loss_v2(pred, y):
+                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
+
+                # sample correct probs
+                weights = 1. - tf.reduce_sum(y * pred, axis=-1)
+                loss = - tf.reduce_sum(y * tf.log(tf.clip_by_value(pred, 1e-30, 1.0)), axis=-1)
+                loss = tf.reduce_mean(weights * loss)
+
+                return loss
+
+            def focal_loss_v3(pred, y, alpha=0.75, gamma=2):
+                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
+
+                preds_softmax = tf.reduce_sum(pred * y, axis=-1)
+                preds_logsoft = tf.log(tf.clip_by_value(preds_softmax, 1e-30, 1.0))
+
+                loss = -(1 - preds_softmax) ** gamma * preds_logsoft
+
+                return tf.reduce_mean(loss)
+
+            # from rl.loss import cross_entropy_loss, rl_loss
+            #
+            # loss_ce = cross_entropy_loss(
+            #     iter_logits, features["start_positions"], features["end_positions"], loop=1)
+            # loss_rl = rl_loss(
+            #     iter_logits, features["start_positions"], features["end_positions"], input_ids)
+
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+
+            # efv_loss = tf.losses.softmax_cross_entropy(features['is_impossible'], outputs['cls_logits'])
+
+            # tf.logging.info(outputs["start_log_probs"].shape)
+            # tf.logging.info(features["start_positions"].shape)
+            # import sys
+            # sys.exit(1)
+
+            # start_loss = focal_loss_v3(
+            #     outputs["start_probs"], features["start_positions"])
+            # end_loss = focal_loss_v3(
+            #     outputs["end_probs"], features["end_positions"])
+            # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # total_loss = loss_ce
+            # # total_loss = (start_loss + end_loss) * 0.5
+
+            # crf_loss = compute_crf_loss(outputs["sequence_output"], features["start_positions"],
+            #                             features["end_positions"])
+
+            # decoder_tvars = [v for v in tvars if v.name.startswith('decoder_loop')]
+            # other_tvars = list(set(tvars).difference(decoder_tvars))
+
+            # train_op1 = optimization.create_optimizer(
+            #     total_loss, learning_rate, 8144, num_warmup_steps, use_tpu, other_tvars)
+            # train_op2 = optimization.create_optimizer(
+            #     total_loss, 1e-3, num_train_steps, None, use_tpu, decoder_tvars)
+
+            # opt2 = tf.train.AdamOptimizer(1e-3)
+            # grads = tf.gradients(total_loss, decoder_tvars)
+            #
+            # # This is how the model was pre-trained.
+            # (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+            # global_step = tf.train.get_global_step()
+            # train_op2 = opt2.apply_gradients(
+            #     list(zip(grads, decoder_tvars)), global_step=global_step)
+            #
+            # train_op = tf.cond(tf.greater(tf.train.get_global_step(), 8144),
+            #                    lambda: train_op2,
+            #                    lambda: tf.group(train_op1, train_op2,
+            #                                     [global_step.assign(tf.train.get_global_step() - 1)]))
+            #
+            # global_step = tf.train.get_global_step()
+            # train_op = tf.group(train_op1, train_op2, [global_step.assign(tf.train.get_global_step() - 1)])
+
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+            # # start_loss = focal_loss(
+            # #     outputs["start_probs"], features["start_positions"])
+            # # end_loss = focal_loss(
+            # #     outputs["end_probs"], features["end_positions"])
+            #
+            # total_loss = (start_loss + end_loss) * 0.5
+
+            # loss_ce = (start_loss + end_loss) * 0.5
+
+            def project_encoder_layers(outputs, features, project_layers_num=4):
+                logits = [[]] * project_layers_num
+
+                all_encoder_layers = outputs["all_encoder_layers"]
+                p_mask = outputs["p_mask"]
+                last_layer_start_logits = outputs["start_logits"]
+                last_layer_end_logits = outputs["end_logits"]
+
+                if project_layers_num < 1:
+                    raise
+                else:
+                    logits[project_layers_num - 1] = tf.stack([last_layer_start_logits, last_layer_end_logits], axis=-1)
+
+                if project_layers_num == 1:
+                    return logits
+
+                for _i in range(project_layers_num - 1):
+                    now_layer = tf.transpose(all_encoder_layers[-_i - 2], [1, 0, 2])
+
+                    with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
+                        start_logits = tf.layers.dense(
+                            now_layer,
+                            1,
+                            kernel_initializer=modeling.create_initializer(
+                                albert_config.initializer_range))
+                        start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
+                        start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
+
+                    # logit of the end position
+                    with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
+                        if is_training:
+                            # during training, compute the end logits based on the
+                            # ground truth of the start position
+                            start_positions = tf.reshape(features["start_positions"], [-1])
+                            start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
+                                                     dtype=tf.float32)
+                            start_features = tf.einsum("lbh,bl->bh", now_layer, start_index)
+                            start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
+                            end_logits = tf.layers.dense(
+                                tf.concat([now_layer, start_features], axis=-1),
+                                albert_config.hidden_size,
+                                kernel_initializer=modeling.create_initializer(
+                                    albert_config.initializer_range),
+                                activation=tf.tanh,
+                                name="dense_0")
+                            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
+
+                            end_logits = tf.layers.dense(
+                                end_logits,
+                                1,
+                                kernel_initializer=modeling.create_initializer(
+                                    albert_config.initializer_range),
+                                name="dense_1")
+                            end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
+                            end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
+                    logits[project_layers_num - 2 - _i] = tf.stack([start_logits_masked, end_logits_masked], axis=-1)
+                return logits
+
+            # from rl.rl_loss import rl_loss
+            # loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"], features["start_positions"],
+            #                   features["end_positions"], sample_num=4)
+
+            # from rl.rl_loss2 import rl_loss, cross_entropy_loss
+            # logits = project_encoder_layers(outputs, features, project_layers_num=1)
+            # # loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
+            # #                              project_layers_num=1, sample_num=4)
+            # loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
+            #                   project_layers_num=1, sample_num=4)
+            #
+            # # total_loss += loss_rl * 0.5
+            # theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            # theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
+
+            # cls_logits = outputs["cls_logits"]
+            # is_impossible = tf.reshape(features["is_impossible"], [-1])
+            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            # # regression_loss = 1/2 * (cls_logits - tf.cast(is_impossible, dtype=tf.float32)) ** 2
+            # regression_loss = tf.reduce_mean(regression_loss)
+            #
+            # # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # # comparable to start_loss and end_loss
+            # total_loss += regression_loss * 0.5
+
+            def get_loss(outputs_, features_):
+                start_loss = compute_loss(
+                    outputs_["start_log_probs"], features_["start_positions"])
+                end_loss = compute_loss(
+                    outputs_["end_log_probs"], features_["end_positions"])
+
+                total_loss = (start_loss + end_loss) * 0.5
+
+                cls_logits = outputs["cls_logits"]
+                is_impossible = tf.reshape(features["is_impossible"], [-1])
+                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+                regression_loss = tf.reduce_mean(regression_loss)
+
+                # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+                # comparable to start_loss and end_loss
+                total_loss += regression_loss * 0.5
+                return total_loss
+
+            total_loss = get_loss(outputs, features)
+
+            # Adds gradient to embedding and recomputes classification loss.
+            def _scale_l2(x, norm_length):
+                # shape(x) = (batch, num_timesteps, d)
+                # Divide x by max(abs(x)) for a numerically stable L2 norm.
+                # 2norm(x) = a * 2norm(x/a)
+                # Scale over the full sequence, dims (1, 2)
+                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                l2_norm = alpha * tf.sqrt(
+                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                x_unit = x / l2_norm
+                return norm_length * x_unit
+
+            grad, = tf.gradients(
+                total_loss,
+                outputs["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
+            embedded_inputs = outputs["word_embedding_output"] + perturb
+            outputs_adv = create_v2_model(
+                albert_model=albert_model,
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=embedded_inputs)
+
+            adv_loss = get_loss(outputs_adv, features)
+            with tf.control_dependencies([total_loss]):
+                adv_loss = tf.identity(adv_loss)
+            total_loss = total_loss * 0.875 + adv_loss * 0.125
+
+            # with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
+            #     _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
+            #                                   use_bias=True,
+            #                                   kernel_initializer=modeling.create_initializer(
+            #                                       albert_config.initializer_range))
+            #     _efv_logits = tf.squeeze(_efv_logits, -1)
+            #     _efv_logits = tf.layers.dense(_efv_logits, 1,
+            #                                   use_bias=True,
+            #                                   kernel_initializer=modeling.create_initializer(
+            #                                       albert_config.initializer_range))
+            #     efv_logits = tf.squeeze(_efv_logits, -1)
+            #     efv_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(is_impossible, dtype=tf.float32),
+            #                                                        logits=efv_logits)
+            #     efv_loss = tf.reduce_mean(efv_loss)
+            #
+            #     total_loss += efv_loss * 0.5
+
+            # total_loss = adversarial_training_loss(total_loss, outputs, features, adv_eps=0.02)
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            # train_op1 = optimization.create_bert_optimizer(
+            #     total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            # train_op2 = optimization.create_other_optimizer(
+            #     total_loss, learning_rate * 100, num_train_steps, use_tpu)
+            # train_op = tf.group(train_op1, train_op2)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
