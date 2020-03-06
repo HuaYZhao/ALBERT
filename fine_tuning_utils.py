@@ -62,7 +62,7 @@ def _create_model_from_scratch(albert_config, is_training, input_ids,
 
 
 def create_albert(albert_config, is_training, input_ids, input_mask,
-                  segment_ids, use_one_hot_embeddings, use_einsum, hub_module, embedded_inputs):
+                  segment_ids, use_one_hot_embeddings, use_einsum, hub_module, embedded_inputs=None):
     """Creates an ALBERT, either from TF-Hub or from scratch."""
     if hub_module:
         tf.logging.info("creating model from hub_module: %s", hub_module)
