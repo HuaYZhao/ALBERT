@@ -1465,6 +1465,7 @@ def create_v2_model(albert_model, albert_config, is_training, input_ids, input_m
         input_mask=input_mask,
         token_type_ids=segment_ids,
         embedded_inputs=embedded_inputs,
+        scope="bert"
     )
 
     bsz = tf.shape(output)[0]
