@@ -217,8 +217,8 @@ class ALBertQAModel(tf.keras.Model):
 
         # self.albert_model = tf.keras.Model(inputs=[input_word_ids, input_mask, input_type_ids],
         #                                    outputs=[sequence_output])
-        if init_checkpoint != None:
-            self.albert_layer.load_weights(init_checkpoint)
+        # if init_checkpoint != None:
+        #     self.albert_layer.load_weights(init_checkpoint)
 
         self.qalayer = ALBertQALayer(self.albert_config.hidden_size, start_n_top, end_n_top,
                                      self.initializer, dropout)

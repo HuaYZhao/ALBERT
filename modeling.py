@@ -368,6 +368,8 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint, num_of_group=0):
         name_to_variable[name] = var
     init_vars = tf.train.list_variables(init_checkpoint)
     init_vars_name = [name for (name, _) in init_vars]
+    print("trainable_vars", tvars)
+    print("checkpoint_vars", init_vars_name)
 
     if num_of_group > 0:
         assignment_map = []
