@@ -233,7 +233,7 @@ class ALBertQAModel(tf.keras.Model):
             start_positions = inputs["start_positions"]
         else:
             start_positions = None
-        _, sequence_output = self.albert_layer(input_word_ids, input_mask, segment_ids)
+        _, sequence_output, word_embedding = self.albert_layer(input_word_ids, input_mask, segment_ids, **kwargs)
         outputs = self.qalayer(
             sequence_output, p_mask, start_positions, **kwargs)
-        return outputs
+        return dict({"word_embedding_output": word_embedding}, **outputs)

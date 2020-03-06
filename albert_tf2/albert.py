@@ -226,7 +226,8 @@ class AlbertModel(tf.keras.layers.Layer):
         input_word_ids = unpacked_inputs[0]
         input_mask = unpacked_inputs[1]
         input_type_ids = unpacked_inputs[2]
-        word_embeddings = self.embedding_lookup(input_word_ids)
+        embedded_inputs = kwargs.get("embedded_inputs", None)
+        word_embeddings = embedded_inputs or self.embedding_lookup(input_word_ids)
         embedding_tensor = self.embedding_postprocessor(
             word_embeddings=word_embeddings, token_type_ids=input_type_ids)
         if self.float_type == tf.float16:
@@ -243,7 +244,7 @@ class AlbertModel(tf.keras.layers.Layer):
         sequence_output = self.encoder(embedding_tensor, attention_mask)
         first_token_tensor = tf.squeeze(sequence_output[:, 0:1, :], axis=1)
         pooled_output = self.pooler_transform(first_token_tensor)
-        return (pooled_output, sequence_output)
+        return (pooled_output, sequence_output, word_embeddings)
 
     def get_config(self):
         config = {"config": self.config.to_dict()}
