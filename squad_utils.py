@@ -1465,7 +1465,6 @@ def create_v2_model(albert_model, albert_config, is_training, input_ids, input_m
         input_mask=input_mask,
         token_type_ids=segment_ids,
         embedded_inputs=embedded_inputs,
-        scope="bert"
     )
 
     bsz = tf.shape(output)[0]
@@ -2036,7 +2035,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        albert_model = modeling.AlbertModel(albert_config, use_one_hot_embeddings)
+        albert_model = modeling.AlbertModel(albert_config, use_one_hot_embeddings, scope="bert")
 
         outputs = create_v2_model(
             albert_model=albert_model,
