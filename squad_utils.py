@@ -1765,10 +1765,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        albert_layer = albert.AlbertModel(config=albert_config)
+        albert_model = albert.get_albert_model(input_ids, input_mask, segment_ids, config=albert_config)
 
         outputs = create_v2_model2(
-            albert_layer=albert_layer,
+            albert_layer=albert_model,
             albert_config=albert_config,
             is_training=is_training,
             input_ids=input_ids,
