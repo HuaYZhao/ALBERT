@@ -1463,7 +1463,7 @@ def create_v2_model(albert_model, albert_config, is_training, input_ids, input_m
         is_training=is_training,
         input_ids=input_ids,
         input_mask=input_mask,
-        segment_ids=segment_ids,
+        token_type_ids=segment_ids,
         embedded_inputs=embedded_inputs,
     )
 
