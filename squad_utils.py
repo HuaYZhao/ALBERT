@@ -2126,7 +2126,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             outputs = outputs_adv
             return outputs_adv["loss"]
 
-        total_loss = tf.cond(tf.equal(training_counter % 2, 0), normal_training, adversarial_training)
+        total_loss = tf.cond(tf.equal(training_counter % 2, 0), normal_training, normal_training)
         embedded_inputs = outputs.get("embedded_inputs", None)
 
         tvars = tf.trainable_variables()
