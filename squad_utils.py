@@ -2098,7 +2098,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             _embedded_inputs = outputs_norm["word_embedding_output"] + perturb
             outputs_norm["loss"] = loss
             outputs_norm["embedded_inputs"] = _embedded_inputs
-            global outputs
+            nonlocal outputs
             outputs = outputs_norm
             return outputs_norm["loss"]
 
@@ -2122,7 +2122,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             adv_loss = get_loss(outputs_adv, features)
             outputs_adv["loss"] = 0.125 / 0.875 * adv_loss
-            global outputs
+            nonlocal outputs
             outputs = outputs_adv
             return outputs_adv["loss"]
 
