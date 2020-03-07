@@ -244,7 +244,8 @@ class AlbertModel(tf.keras.layers.Layer):
         sequence_output = self.encoder(embedding_tensor, attention_mask)
         first_token_tensor = tf.squeeze(sequence_output[:, 0:1, :], axis=1)
         # pooled_output = self.pooler_transform(first_token_tensor)
-        return (_, sequence_output, word_embeddings)
+        pooled_output = None
+        return (pooled_output, sequence_output, word_embeddings)
 
     def get_config(self):
         config = {"config": self.config.to_dict()}
