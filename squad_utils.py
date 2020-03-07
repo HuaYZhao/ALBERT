@@ -2031,6 +2031,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         global_step = tf.train.get_or_create_global_step()
         training_counter = global_step
 
+        def compute_loss(log_probs, positions):
+            one_hot_positions = tf.one_hot(
+                positions, depth=seq_length, dtype=tf.float32)
+
+            loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+            loss = tf.reduce_mean(loss)
+            return loss
+
         def get_loss(outputs_, features_):
             start_loss = compute_loss(
                 outputs_["start_log_probs"], features_["start_positions"])
@@ -2143,14 +2151,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             batch_size = modeling.get_shape_list(input_ids)[0]
             seq_length = modeling.get_shape_list(input_ids)[1]
-
-            def compute_loss(log_probs, positions):
-                one_hot_positions = tf.one_hot(
-                    positions, depth=seq_length, dtype=tf.float32)
-
-                loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-                loss = tf.reduce_mean(loss)
-                return loss
 
             def compute_sn_loss(log_probs, positions):
                 def exp_mask(val, mask):
