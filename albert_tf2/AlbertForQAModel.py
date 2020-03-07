@@ -242,6 +242,7 @@ class ALBertQAModel(tf.keras.Model):
             start_positions = None
         sequence_output = self.albert_layer(inputs=[input_word_ids, segment_ids],
                                             mask=input_mask,
+                                            embedded_inputs=kwargs.get('embedded_inputs', None),
                                             training=kwargs.get('training', False))
         outputs = self.qalayer(
             sequence_output, p_mask, start_positions, **kwargs)
