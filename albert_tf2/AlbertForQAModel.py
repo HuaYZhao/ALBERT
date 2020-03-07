@@ -224,11 +224,11 @@ class ALBertQAModel(tf.keras.Model):
         self.qalayer = ALBertQALayer(self.albert_config.hidden_size, start_n_top, end_n_top,
                                      self.initializer, dropout)
 
-    def build(self, input_shape):
-        self.albert_layer.build(input_shape)
-        self.qalayer.build(input_shape)
-        self.built = True
-        return self.albert_layer
+    # def build(self, input_shape):
+    #     self.albert_layer.build(input_shape)
+    #     self.qalayer.build(input_shape)
+    #     self.built = True
+    #     return self.albert_layer
 
     def call(self, inputs, **kwargs):
         # unpacked_inputs = tf_utils.unpack_inputs(inputs)
