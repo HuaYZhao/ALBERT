@@ -1458,7 +1458,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         use_einsum=True,
         hub_module=hub_module,
         embedded_inputs=embedded_inputs,
-        )
+    )
 
     bsz = tf.shape(output)[0]
     seq_length = modeling.get_shape_list(output)[1]
@@ -2027,20 +2027,92 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         segment_ids = features["segment_ids"]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+        embedded_inputs = None
+        global_step = tf.train.get_or_create_global_step()
+        training_counter = global_step
 
-        outputs = create_v2_model(
-            albert_config=albert_config,
-            is_training=is_training,
-            input_ids=input_ids,
-            input_mask=input_mask,
-            segment_ids=segment_ids,
-            use_one_hot_embeddings=use_one_hot_embeddings,
-            features=features,
-            max_seq_length=max_seq_length,
-            start_n_top=start_n_top,
-            end_n_top=end_n_top,
-            dropout_prob=dropout_prob,
-            hub_module=hub_module)
+        def get_loss(outputs_, features_):
+            start_loss = compute_loss(
+                outputs_["start_log_probs"], features_["start_positions"])
+            end_loss = compute_loss(
+                outputs_["end_log_probs"], features_["end_positions"])
+
+            total_loss = (start_loss + end_loss) * 0.5
+
+            cls_logits = outputs_["cls_logits"]
+            is_impossible = tf.reshape(features["is_impossible"], [-1])
+            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            regression_loss = tf.reduce_mean(regression_loss)
+
+            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # comparable to start_loss and end_loss
+            total_loss += regression_loss * 0.5
+            return total_loss
+
+        # Adds gradient to embedding and recomputes classification loss.
+        def _scale_l2(x, norm_length):
+            # shape(x) = (batch, num_timesteps, d)
+            # Divide x by max(abs(x)) for a numerically stable L2 norm.
+            # 2norm(x) = a * 2norm(x/a)
+            # Scale over the full sequence, dims (1, 2)
+            alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+            l2_norm = alpha * tf.sqrt(
+                tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+            x_unit = x / l2_norm
+            return norm_length * x_unit
+
+        def normal_training():
+            tf.logging.info(
+                f"now normal training, global step: {tf.train.get_global_step()}, training_counter: {training_counter}")
+            outputs_norm = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module)
+            loss = get_loss(outputs_norm, features)
+            grad, = tf.gradients(
+                loss,
+                outputs_norm["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
+            _embedded_inputs = outputs_norm["word_embedding_output"] + perturb
+            outputs_norm["loss"] = loss
+            outputs_norm["embedded_inputs"] = _embedded_inputs
+            return outputs_norm
+
+        def adversarial_training():
+            tf.logging.info(
+                f"now adversarial training, global step: {tf.train.get_global_step()}, training_counter: {training_counter}")
+            outputs_adv = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=embedded_inputs)
+
+            adv_loss = get_loss(outputs_adv, features)
+            outputs_adv["loss"] = 0.125 / 0.875 * adv_loss
+            return outputs_adv
+
+        outputs = tf.cond(tf.equal(training_counter % 2, 0), normal_training, adversarial_training)
+        embedded_inputs = outputs.get("embedded_inputs", None)
 
         tvars = tf.trainable_variables()
 
@@ -2316,64 +2388,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # # comparable to start_loss and end_loss
             # total_loss += regression_loss * 0.5
 
-            def get_loss(outputs_, features_):
-                start_loss = compute_loss(
-                    outputs_["start_log_probs"], features_["start_positions"])
-                end_loss = compute_loss(
-                    outputs_["end_log_probs"], features_["end_positions"])
-
-                total_loss = (start_loss + end_loss) * 0.5
-
-                cls_logits = outputs["cls_logits"]
-                is_impossible = tf.reshape(features["is_impossible"], [-1])
-                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                regression_loss = tf.reduce_mean(regression_loss)
-
-                # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-                # comparable to start_loss and end_loss
-                total_loss += regression_loss * 0.5
-                return total_loss
-
-            total_loss = get_loss(outputs, features)
-
-            # Adds gradient to embedding and recomputes classification loss.
-            def _scale_l2(x, norm_length):
-                # shape(x) = (batch, num_timesteps, d)
-                # Divide x by max(abs(x)) for a numerically stable L2 norm.
-                # 2norm(x) = a * 2norm(x/a)
-                # Scale over the full sequence, dims (1, 2)
-                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-                l2_norm = alpha * tf.sqrt(
-                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-                x_unit = x / l2_norm
-                return norm_length * x_unit
-
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
-            embedded_inputs = outputs["word_embedding_output"] + perturb
-            outputs_adv = create_v2_model(
-                albert_config=albert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                segment_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings,
-                features=features,
-                max_seq_length=max_seq_length,
-                start_n_top=start_n_top,
-                end_n_top=end_n_top,
-                dropout_prob=dropout_prob,
-                hub_module=hub_module,
-                embedded_inputs=embedded_inputs)
-
-            adv_loss = get_loss(outputs_adv, features)
-
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
-            total_loss = adv_loss
 
             # with tf.variable_scope("efv", reuse=tf.AUTO_REUSE):
             #     _efv_logits = tf.layers.dense(outputs["sequence_output"], 1,
@@ -2393,8 +2408,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     total_loss += efv_loss * 0.5
 
             # total_loss = adversarial_training_loss(total_loss, outputs, features, adv_eps=0.02)
-            train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            total_loss = outputs["loss"]
+
+            if "embedded_inputs" in outputs:
+                decrease_op = tf.no_op()
+            else:
+                decrease_op = global_step.assign(global_step - 1)
+            training_counter_increase = training_counter.assign(training_counter + 1)
+
+            with tf.control_dependencies([decrease_op, training_counter_increase]):
+                train_op = optimization.create_optimizer(
+                    total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
             # train_op1 = optimization.create_bert_optimizer(
             #     total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
             # train_op2 = optimization.create_other_optimizer(
