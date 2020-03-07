@@ -2097,7 +2097,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
             _embedded_inputs = outputs_norm["word_embedding_output"] + perturb
             outputs_norm["loss"] = loss
-            outputs_norm["embedded_inputs"] = _embedded_inputs
+            outputs_norm["embedded_inputs"] = tf.stop_gradient(_embedded_inputs)
             nonlocal outputs
             outputs = outputs_norm
             return outputs_norm["loss"]
@@ -2438,6 +2438,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
+            print(outputs.keys())
             predictions = {
                 "unique_ids": features["unique_ids"],
                 "start_top_index": outputs["start_top_index"],
