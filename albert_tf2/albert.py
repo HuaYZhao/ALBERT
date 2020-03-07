@@ -339,13 +339,13 @@ class EmbeddingPostprocessor(tf.keras.layers.Layer):
             name="layer_norm", axis=-1, epsilon=1e-12, dtype=tf.float32)
         self.output_dropout = tf.keras.layers.Dropout(rate=self.dropout_prob,
                                                       dtype=tf.float32)
-        self.projection = Dense2DProjection(
-            output_size=self.hidden_size,
-            kernel_initializer=get_initializer(self.initializer_range),
-            activation=None,
-            # Uses float32 so that gelu activation is done in float32.
-            fp32_activation=True,
-            name="embedding_hidden_mapping_in")
+        # self.projection = Dense2DProjection(
+        #     output_size=self.hidden_size,
+        #     kernel_initializer=get_initializer(self.initializer_range),
+        #     activation=None,
+        #     # Uses float32 so that gelu activation is done in float32.
+        #     fp32_activation=True,
+        #     name="embedding_hidden_mapping_in")
         super(EmbeddingPostprocessor, self).build(input_shapes)
 
     def __call__(self, word_embeddings, token_type_ids=None, **kwargs):
@@ -384,9 +384,9 @@ class EmbeddingPostprocessor(tf.keras.layers.Layer):
         output = self.output_layer_norm(output)
         output = self.output_dropout(output, training=kwargs.get('training', False))
 
-        projected_output = self.projection(output)
+        # projected_output = self.projection(output)
 
-        return projected_output
+        return output
 
 
 class Attention(tf.keras.layers.Layer):

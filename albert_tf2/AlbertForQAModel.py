@@ -226,7 +226,7 @@ class ALBertQAModel(tf.keras.Model):
     def build(self, unused_input_shapes):
         self.albert_layer.build(unused_input_shapes)
         self.qalayer.build(unused_input_shapes)
-        self.built = True
+        super(ALBertQAModel, self).build(unused_input_shapes)
 
     def call(self, inputs, **kwargs):
         # unpacked_inputs = tf_utils.unpack_inputs(inputs)
