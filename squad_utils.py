@@ -34,9 +34,6 @@ import six
 from six.moves import map
 from six.moves import range
 import tensorflow.compat.v1 as tf
-import bert
-from albert_tf2.AlbertForQAModel import ALBertQAModel
-
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
@@ -1449,9 +1446,9 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
 def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                    hub_module):
+                    hub_module, embedded_inputs=None):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
+    (_, output, _, word_embedding_output) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1459,17 +1456,19 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         segment_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=True,
-        hub_module=hub_module)
+        hub_module=hub_module,
+        embedded_inputs=embedded_inputs)
 
     bsz = tf.shape(output)[0]
-    return_dict = {}
+    return_dict = dict()
+    return_dict["word_embedding_output"] = word_embedding_output
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
     # logit of the start position
-    with tf.variable_scope("start_logits"):
+    with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
         start_logits = tf.layers.dense(
             output,
             1,
@@ -1480,7 +1479,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
     # logit of the end position
-    with tf.variable_scope("end_logits"):
+    with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
         if is_training:
             # during training, compute the end logits based on the
             # ground truth of the start position
@@ -1558,7 +1557,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["end_top_index"] = end_top_index
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class"):
+    with tf.variable_scope("answer_class", reuse=tf.AUTO_REUSE):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
@@ -1596,20 +1595,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return return_dict
 
 
-# def build_albert_tf2model(albert_config=albert_config,
-#                           is_training=is_training,
-#                           input_ids=input_ids,
-#                           input_mask=input_mask,
-#                           segment_ids=segment_ids,
-#                           use_one_hot_embeddings=use_one_hot_embeddings,
-#                           features=features,
-#                           max_seq_length=max_seq_length,
-#                           start_n_top=start_n_top,
-#                           end_n_top=end_n_top,
-#                           dropout_prob=dropout_prob):
-#     pass
-
-
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1627,34 +1612,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
-        p_mask = features["p_mask"]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        # outputs = create_v2_model(
-        #     albert_config=albert_config,
-        #     is_training=is_training,
-        #     input_ids=input_ids,
-        #     input_mask=input_mask,
-        #     segment_ids=segment_ids,
-        #     use_one_hot_embeddings=use_one_hot_embeddings,
-        #     features=features,
-        #     max_seq_length=max_seq_length,
-        #     start_n_top=start_n_top,
-        #     end_n_top=end_n_top,
-        #     dropout_prob=dropout_prob,
-        #     hub_module=hub_module)
-
-        # squad_model = tf.keras.Sequential([
-        #     ALBertQAModel(albert_config, max_seq_length, init_checkpoint, start_n_top, end_n_top, dropout_prob)
-        # ])
-        squad_model = ALBertQAModel(albert_config, max_seq_length, init_checkpoint, start_n_top, end_n_top,
-                                    dropout_prob)
-
-        # albert_layer = squad_model.build(input_shape=[(None, max_seq_length), (None, max_seq_length)])
-        outputs = squad_model(inputs=features, training=is_training)
-        # outputs = squad_model(inputs=features, training=is_training)
-        # bert.load_albert_weights(albert_layer, init_checkpoint)
+        outputs = create_v2_model(
+            albert_config=albert_config,
+            is_training=is_training,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            segment_ids=segment_ids,
+            use_one_hot_embeddings=use_one_hot_embeddings,
+            features=features,
+            max_seq_length=max_seq_length,
+            start_n_top=start_n_top,
+            end_n_top=end_n_top,
+            dropout_prob=dropout_prob,
+            hub_module=hub_module)
 
         tvars = tf.trainable_variables()
 
@@ -1731,40 +1704,51 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = get_loss(outputs, features)
 
-            # # Adds gradient to embedding and recomputes classification loss.
-            # def _scale_l2(x, norm_length):
-            #     # shape(x) = (batch, num_timesteps, d)
-            #     # Divide x by max(abs(x)) for a numerically stable L2 norm.
-            #     # 2norm(x) = a * 2norm(x/a)
-            #     # Scale over the full sequence, dims (1, 2)
-            #     alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-            #     l2_norm = alpha * tf.sqrt(
-            #         tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-            #     x_unit = x / l2_norm
-            #     return norm_length * x_unit
-            #
-            # grad, = tf.gradients(
-            #     total_loss,
-            #     outputs["word_embedding_output"])
-            # grad = tf.stop_gradient(grad)
-            # perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
-            # embedded_inputs = outputs["word_embedding_output"] + perturb
-            # outputs_adv = squad_model(inputs=features, training=is_training, embedded_inputs=embedded_inputs)
-            #
-            # adv_loss = get_loss(outputs_adv, features)
-            #
-            # total_loss = total_loss * 0.875 + adv_loss * 0.125
+            # Adds gradient to embedding and recomputes classification loss.
+            def _scale_l2(x, norm_length):
+                # shape(x) = (batch, num_timesteps, d)
+                # Divide x by max(abs(x)) for a numerically stable L2 norm.
+                # 2norm(x) = a * 2norm(x/a)
+                # Scale over the full sequence, dims (1, 2)
+                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                l2_norm = alpha * tf.sqrt(
+                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                x_unit = x / l2_norm
+                return norm_length * x_unit
 
+            grad, = tf.gradients(
+                total_loss,
+                outputs["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
+            embedded_inputs = outputs["word_embedding_output"] + perturb
+            outputs_adv = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=embedded_inputs)
+
+            adv_loss = get_loss(outputs_adv, features)
+
+            total_loss = total_loss * 0.875 + adv_loss * 0.125
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-            # profiler_hook = tf.estimator.ProfilerHook(save_secs=60, show_memory=True)
+            print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
                 train_op=train_op,
-                scaffold_fn=scaffold_fn,
-                training_hooks=None)
+                scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
