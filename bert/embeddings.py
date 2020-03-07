@@ -205,6 +205,7 @@ class BertEmbeddingsLayer(bert.Layer):
             embedding_output = embedded_inputs
         else:
             embedding_output = self.word_embeddings_layer(input_ids)
+        word_embedding_output = embedding_output
 
         # ALBERT: for brightmart/albert_zh weights - project only token embeddings
         if not self.params.project_position_embeddings:
@@ -232,7 +233,7 @@ class BertEmbeddingsLayer(bert.Layer):
             if self.word_embeddings_projector_layer:
                 embedding_output = self.word_embeddings_projector_layer(embedding_output)
 
-        return embedding_output  # [B, seq_len, hidden_size]
+        return embedding_output, word_embedding_output  # [B, seq_len, hidden_size]
 
     def compute_mask(self, inputs, mask=None):
         if isinstance(inputs, list):

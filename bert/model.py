@@ -72,6 +72,9 @@ class BertModelLayer(Layer):
         if mask is None:
             mask = self.embeddings_layer.compute_mask(inputs)
 
-        embedding_output = self.embeddings_layer(inputs, mask=mask, embedded_inputs=None, training=training)
-        output = self.encoders_layer(embedding_output, mask=mask, training=training)
-        return output  # [B, seq_len, hidden_size]
+        embedding_output, word_embedding_output = self.embeddings_layer(inputs,
+                                                                        mask=mask,
+                                                                        embedded_inputs=None,
+                                                                        training=training)
+        sequence_output = self.encoders_layer(embedding_output, mask=mask, training=training)
+        return sequence_output, word_embedding_output  # [B, seq_len, hidden_size]
