@@ -34,6 +34,7 @@ import six
 from six.moves import map
 from six.moves import range
 import tensorflow.compat.v1 as tf
+import bert
 from albert_tf2.AlbertForQAModel import ALBertQAModel
 
 from tensorflow.contrib import data as contrib_data
@@ -1629,11 +1630,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         #     end_n_top=end_n_top,
         #     dropout_prob=dropout_prob,
         #     hub_module=hub_module)
+
         squad_model = ALBertQAModel(
             albert_config, max_seq_length, init_checkpoint, start_n_top, end_n_top, dropout_prob)
         squad_model.build(unused_input_shapes=(None, max_seq_length))
         outputs = squad_model(inputs=features, training=is_training)
-        # outputs = squad_model(inputs=features, training=is_training)
         tvars = tf.trainable_variables()
 
         initialized_variable_names = {}

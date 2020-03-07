@@ -1,7 +1,7 @@
 import tensorflow as tf
 from albert_tf2 import tf_utils
 from albert_tf2.albert import AlbertConfig, AlbertModel
-
+import bert
 import copy
 
 
@@ -210,7 +210,8 @@ class ALBertQAModel(tf.keras.Model):
         # input_type_ids = tf.keras.layers.Input(
         #     shape=(max_seq_length,), dtype=tf.int32, name='input_type_ids')
 
-        self.albert_layer = AlbertModel(config=albert_config, float_type=float_type)
+        # self.albert_layer = AlbertModel(config=albert_config, float_type=float_type)
+        self.albert_layer = bert.BertModelLayer.from_params(albert_config)
 
         # _, sequence_output = albert_layer(
         #     input_word_ids, input_mask, input_type_ids)
@@ -223,10 +224,10 @@ class ALBertQAModel(tf.keras.Model):
         self.qalayer = ALBertQALayer(self.albert_config.hidden_size, start_n_top, end_n_top,
                                      self.initializer, dropout)
 
-    def build(self, unused_input_shapes):
-        self.albert_layer.build(unused_input_shapes)
-        self.qalayer.build(unused_input_shapes)
-        self.built = True
+    # def build(self, unused_input_shapes):
+    #     self.albert_layer.build(unused_input_shapes)
+    #     self.qalayer.build(unused_input_shapes)
+    #     self.built = True
 
     def call(self, inputs, **kwargs):
         # unpacked_inputs = tf_utils.unpack_inputs(inputs)
@@ -238,7 +239,9 @@ class ALBertQAModel(tf.keras.Model):
             start_positions = inputs["start_positions"]
         else:
             start_positions = None
-        _, sequence_output, word_embedding = self.albert_layer(input_word_ids, input_mask, segment_ids, **kwargs)
+        sequence_output = self.albert_layer(inputs=[input_word_ids, segment_ids],
+                                            mask=input_mask,
+                                            training=kwargs.get('training', False))
         outputs = self.qalayer(
             sequence_output, p_mask, start_positions, **kwargs)
-        return dict({"word_embedding_output": word_embedding}, **outputs)
+        return outputs
