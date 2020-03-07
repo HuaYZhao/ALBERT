@@ -213,7 +213,6 @@ class ALBertQAModel(tf.keras.Model):
 
         # self.albert_layer = AlbertModel(config=albert_config, float_type=float_type)
         self.albert_layer = bert.BertModelLayer.from_params(albert_config)
-        self.albert_model = tf.keras.Sequential([self.albert_layer])
 
         # _, sequence_output = albert_layer(
         #     input_word_ids, input_mask, input_type_ids)
@@ -226,12 +225,6 @@ class ALBertQAModel(tf.keras.Model):
         self.qalayer = ALBertQALayer(self.albert_config.hidden_size, start_n_top, end_n_top,
                                      self.initializer, dropout)
 
-    # def build(self, input_shape):
-    #     self.albert_model.build(input_shape)
-    #     self.qalayer.build(input_shape)
-    #     bert.load_albert_weights(self.albert_layer, self.init_checkpoint)
-    #     self.built = True
-
     def call(self, inputs, **kwargs):
         # unpacked_inputs = tf_utils.unpack_inputs(inputs)
         input_word_ids = inputs["input_ids"]
@@ -242,7 +235,7 @@ class ALBertQAModel(tf.keras.Model):
             start_positions = inputs["start_positions"]
         else:
             start_positions = None
-        sequence_output, word_embedding_output = self.albert_model(inputs=[input_word_ids, segment_ids],
+        sequence_output, word_embedding_output = self.albert_layer(inputs=[input_word_ids, segment_ids],
                                                                    mask=input_mask,
                                                                    embedded_inputs=kwargs.get('embedded_inputs', None),
                                                                    training=kwargs.get('training', False))
