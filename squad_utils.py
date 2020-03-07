@@ -2028,6 +2028,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         embedded_inputs = None
+        outputs = None
         global_step = tf.train.get_or_create_global_step()
         training_counter = global_step
         batch_size = modeling.get_shape_list(input_ids)[0]
@@ -2097,7 +2098,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             _embedded_inputs = outputs_norm["word_embedding_output"] + perturb
             outputs_norm["loss"] = loss
             outputs_norm["embedded_inputs"] = _embedded_inputs
-            return outputs_norm
+            global outputs
+            outputs = outputs_norm
+            return outputs_norm["loss"]
 
         def adversarial_training():
             tf.logging.info(
@@ -2119,9 +2122,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             adv_loss = get_loss(outputs_adv, features)
             outputs_adv["loss"] = 0.125 / 0.875 * adv_loss
-            return outputs_adv
+            global outputs
+            outputs = outputs_adv
+            return outputs_adv["loss"]
 
-        outputs = tf.cond(tf.equal(tf.train.get_or_create_global_step() % 2, 0), normal_training, adversarial_training)
+        total_loss = tf.cond(tf.equal(training_counter % 2, 0), normal_training, adversarial_training)
         embedded_inputs = outputs.get("embedded_inputs", None)
 
         tvars = tf.trainable_variables()
@@ -2410,7 +2415,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     total_loss += efv_loss * 0.5
 
             # total_loss = adversarial_training_loss(total_loss, outputs, features, adv_eps=0.02)
-            total_loss = outputs["loss"]
+            # total_loss = outputs["loss"]
 
             if "embedded_inputs" in outputs:
                 decrease_op = tf.no_op()
