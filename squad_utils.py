@@ -1721,12 +1721,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 x_unit = x / l2_norm
                 return norm_length * x_unit
 
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
-            embedded_inputs = outputs["word_embedding_output"] + perturb
+            # grad, = tf.gradients(
+            #     total_loss,
+            #     outputs["word_embedding_output"])
+            # grad = tf.stop_gradient(grad)
+            # perturb = _scale_l2(grad, 0.125)  # set low for tpu mode
+            embedded_inputs = outputs["word_embedding_output"]  # + perturb
             outputs_adv = squad_model(inputs=features, training=is_training, embedded_inputs=embedded_inputs)
 
             adv_loss = get_loss(outputs_adv, features)
