@@ -219,11 +219,11 @@ def validate_flags_or_throw(albert_config):
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
-    # albert_config = modeling.AlbertConfig.from_json_file(FLAGS.albert_config_file)
+    albert_config = modeling.AlbertConfig.from_json_file(FLAGS.albert_config_file)
     # from albert_tf2.albert import AlbertConfig
     # albert_config = AlbertConfig.from_json_file(FLAGS.albert_config_file)
-    import bert
-    albert_config = bert.params_from_pretrained_ckpt(os.path.dirname(FLAGS.albert_config_file))
+    # import bert
+    # albert_config = bert.params_from_pretrained_ckpt(os.path.dirname(FLAGS.albert_config_file))
 
     validate_flags_or_throw(albert_config)
 
