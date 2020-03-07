@@ -2030,6 +2030,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedded_inputs = None
         global_step = tf.train.get_or_create_global_step()
         training_counter = global_step
+        batch_size = modeling.get_shape_list(input_ids)[0]
+        seq_length = modeling.get_shape_list(input_ids)[1]
 
         def compute_loss(log_probs, positions):
             one_hot_positions = tf.one_hot(
