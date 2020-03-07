@@ -213,7 +213,7 @@ class ALBertQAModel(tf.keras.Model):
 
         # self.albert_layer = AlbertModel(config=albert_config, float_type=float_type)
         self.albert_layer = bert.BertModelLayer.from_params(albert_config)
-        self.albert_model = tf.keras.Sequential([albert_layer])
+        self.albert_model = tf.keras.Sequential([self.albert_layer])
 
         # _, sequence_output = albert_layer(
         #     input_word_ids, input_mask, input_type_ids)
