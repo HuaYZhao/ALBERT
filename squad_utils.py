@@ -1596,6 +1596,20 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return return_dict
 
 
+def build_albert_tf2model(albert_config=albert_config,
+                          is_training=is_training,
+                          input_ids=input_ids,
+                          input_mask=input_mask,
+                          segment_ids=segment_ids,
+                          use_one_hot_embeddings=use_one_hot_embeddings,
+                          features=features,
+                          max_seq_length=max_seq_length,
+                          start_n_top=start_n_top,
+                          end_n_top=end_n_top,
+                          dropout_prob=dropout_prob):
+    pass
+
+
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1636,7 +1650,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         # ])
         squad_model = ALBertQAModel(albert_config, max_seq_length, init_checkpoint, start_n_top, end_n_top,
                                     dropout_prob)
-        squad_model.build(input_shape=[(None, max_seq_length), (None, max_seq_length)])
+        squad_model.albert_model.build(input_shape=[(None, max_seq_length), (None, max_seq_length)])
         # bert.load_albert_weights(squad_model.albert_layer, init_checkpoint)
         # bert.load_stock_weights()
         # albert_layer = squad_model.build(input_shape=[(None, max_seq_length), (None, max_seq_length)])
