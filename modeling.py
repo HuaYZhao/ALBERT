@@ -196,18 +196,19 @@ class AlbertModel(object):
 
         with tf.variable_scope(scope, default_name="bert", reuse=tf.AUTO_REUSE):
             with tf.variable_scope("embeddings"):
-                if embedded_inputs is not None:
-                    self.word_embedding_output = tf.identity(embedded_inputs)
-                else:
-                    # Perform embedding lookup on the word ids.
-                    (self.word_embedding_output,
-                     self.output_embedding_table) = embedding_lookup(
-                        input_ids=input_ids,
-                        vocab_size=config.vocab_size,
-                        embedding_size=config.embedding_size,
-                        initializer_range=config.initializer_range,
-                        word_embedding_name="word_embeddings",
-                        use_one_hot_embeddings=use_one_hot_embeddings)
+                # Perform embedding lookup on the word ids.
+                (self.word_embedding_output,
+                 self.output_embedding_table) = embedding_lookup(
+                    input_ids=input_ids,
+                    vocab_size=config.vocab_size,
+                    embedding_size=config.embedding_size,
+                    initializer_range=config.initializer_range,
+                    word_embedding_name="word_embeddings",
+                    use_one_hot_embeddings=use_one_hot_embeddings)
+                if embedded_inputs:
+                    self.word_embedding_output = tf.where(tf.equal(embedded_inputs, -1e5),
+                                                          self.word_embedding_output,
+                                                          embedded_inputs)
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
