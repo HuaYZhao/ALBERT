@@ -1756,8 +1756,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                                          [vocab_size, embedding_size])  # [30000,128]
             print("perturb_embedding_with_shape", perturb_embedding_with_shape.shape)
 
-            def avg_perturb(idx, count):
-                count = tf.cast(count, tf.float32)
+            def avg_perturb(elems):
+                idx = elems[0]
+                count = tf.cast(elems[1], tf.float32)
                 new_perturb[idx, :] /= count
                 return new_perturb
 
