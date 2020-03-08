@@ -1760,6 +1760,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedding_multiple = tf.where(tf.equal(perturb_embedding_multiple, 0),
                                                   tf.ones_like(perturb_embedding_multiple),
                                                   perturb_embedding_multiple)
+            perturb_embedding_multiple = tf.tile(tf.expand_dims(perturb_embedding_multiple, -1), [1, embedding_size])
             print("perturb_embedding_multiple", perturb_embedding_multiple)
             perturb_embedding_with_shape *= perturb_embedding_multiple
 
