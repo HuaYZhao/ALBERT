@@ -1754,8 +1754,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             flat_perturb = tf.reshape(perturb_embedding, [-1, embedding_size])
             perturb_embedding_with_shape = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), flat_perturb,
                                                          [vocab_size, embedding_size])  # [30000,128]
-            perturb_embedding_multiple = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), unique_input_ids_counts,
+            perturb_embedding_multiple = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), 1. / unique_input_ids_counts,
                                                        [vocab_size])  # [30000]
+            perturb_embedding_multiple = tf.where(tf.equal(perturb_embedding_multiple, 0),
+                                                  tf.ones_like(perturb_embedding_multiple),
+                                                  perturb_embedding_multiple)
             print("perturb_embedding_multiple", perturb_embedding_multiple)
             perturb_embedding_with_shape *= perturb_embedding_multiple
 
