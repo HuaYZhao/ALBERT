@@ -1626,7 +1626,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         flat_input_ids = tf.reshape(input_ids, [-1])
         one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)  # [5*384, 30000]
         # 取扰动的embedding
-        if is_training and np.random.rand() < 0.5:
+        if is_training and np.random.rand() < 0.2:
             output = tf.matmul(one_hot_input_ids, perturb_embedding_table)
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
@@ -1763,15 +1763,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedding_multiple = tf.tile(tf.expand_dims(perturb_embedding_multiple, -1), [1, embedding_size])
             perturb_embedding_with_shape *= perturb_embedding_multiple
 
-            # def avg_perturb(tensors):
-            #     idx = tensors[0]
-            #     count = tf.cast(tensors[1], tf.float32)
-            #     perturb_embedding_with_shape[idx, :].assign(perturb_embedding_with_shape[idx, :] / count)
-            #     return perturb_embedding_with_shape
-            #
-            # perturb_embedding_with_shape = tf.map_fn(avg_perturb,
-            #                                          (unique_input_ids, unique_input_ids_counts),
-            #                                          dtype=tf.float32)
             final_perturb_embedded_table = clear_perturb_embedded_table + perturb_embedding_with_shape
             assign_op = tf.assign(perturb_embedding_table, final_perturb_embedded_table)
 
