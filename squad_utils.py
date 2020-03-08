@@ -1632,8 +1632,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
         else:
-            perturb_embedded_inputs = tf.ones(shape=[vocab_size, embedding_size],
-                                              dtype=tf.float32) * -1e5
+            perturb_embedded_inputs = None
 
         outputs = create_v2_model(
             albert_config=albert_config,

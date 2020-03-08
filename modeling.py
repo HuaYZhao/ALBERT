@@ -205,7 +205,7 @@ class AlbertModel(object):
                     initializer_range=config.initializer_range,
                     word_embedding_name="word_embeddings",
                     use_one_hot_embeddings=use_one_hot_embeddings)
-                if embedded_inputs:
+                if embedded_inputs is not None:
                     self.word_embedding_output = tf.where(tf.equal(embedded_inputs, -1e5),
                                                           self.word_embedding_output,
                                                           embedded_inputs)
