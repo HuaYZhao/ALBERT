@@ -1616,8 +1616,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedding_size = albert_config.embedding_size
         with tf.variable_scope("perturb_embedding_table", reuse=tf.AUTO_REUSE):
             perturb_embedding_table = tf.get_variable("embedding_table",
-                                                      initializer=tf.ones(shape=[vocab_size, embedding_size],
-                                                                          dtype=tf.float32) * -1e5,
+                                                      initializer=lambda: tf.ones(shape=[vocab_size, embedding_size],
+                                                                                  dtype=tf.float32) * -1e5,
                                                       trainable=False,
                                                       dtype=tf.float32)
 
