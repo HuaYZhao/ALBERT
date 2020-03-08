@@ -1616,8 +1616,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedding_size = albert_config.embedding_size
         with tf.variable_scope("perturb_embedding_table", reuse=tf.AUTO_REUSE):
             perturb_embedding_table = tf.get_variable("embedding_table",
-                                                      initializer=lambda: tf.ones(shape=[vocab_size, embedding_size],
-                                                                                  dtype=tf.float32) * -1e5,
+                                                      initializer=lambda: tf.zeros(shape=[vocab_size, embedding_size],
+                                                                                   dtype=tf.float32),
                                                       trainable=True,
                                                       dtype=tf.float32)
 
@@ -1632,7 +1632,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
-            loss_rate = 0.15
+            # loss_rate = 0.15
         else:
             perturb_embedded_inputs = None
 
@@ -1743,7 +1743,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 outputs["word_embedding_output"])
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            perturb_embedding = outputs["word_embedding_output"] + perturb
+            perturb_embedding = perturb
 
             # 之前取完之后,相应的位置要更新为0
             input_ids_with_shape = tf.tile(
