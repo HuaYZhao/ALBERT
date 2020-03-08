@@ -1755,10 +1755,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedding_with_shape = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), flat_perturb,
                                                          [vocab_size, embedding_size])  # [30000,128]
 
-            def avg_perturb(elems):
-                idx = elems[0]
-                count = tf.cast(elems[1], tf.float32)
-                perturb_embedding_with_shape[idx, :] /= count
+            def avg_perturb(tensors):
+                idx = tensors[0]
+                count = tf.cast(tensors[1], tf.float32)
+                perturb_embedding_with_shape[idx, :].assign(perturb_embedding_with_shape[idx, :] / count)
                 return perturb_embedding_with_shape
 
             perturb_embedding_with_shape = tf.map_fn(avg_perturb,
