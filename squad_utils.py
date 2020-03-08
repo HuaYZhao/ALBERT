@@ -1625,12 +1625,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         flat_input_ids = tf.reshape(input_ids, [-1])
         one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)  # [5*384, 30000]
+        loss_rate = 1.
         # 取扰动的embedding
-        if is_training and np.random.rand() < 0.2:
+        if is_training and np.random.rand() < 0.5:
             output = tf.matmul(one_hot_input_ids, perturb_embedding_table)
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
+            loss_rate = 0.15
         else:
             perturb_embedded_inputs = None
 
@@ -1722,7 +1724,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 total_loss += regression_loss * 0.5
                 return total_loss
 
-            total_loss = get_loss(outputs, features)
+            total_loss = loss_rate * get_loss(outputs, features)
 
             # Adds gradient to embedding and recomputes classification loss.
             def _scale_l2(x, norm_length):
@@ -1741,7 +1743,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 outputs["word_embedding_output"])
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            perturb_embedding = outputs["word_embedding_output"] + perturb * 0.15
+            perturb_embedding = outputs["word_embedding_output"] + perturb
 
             # 之前取完之后,相应的位置要更新为0
             input_ids_with_shape = tf.tile(
