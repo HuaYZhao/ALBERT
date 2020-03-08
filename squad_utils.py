@@ -1749,11 +1749,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 [1, embedding_size])  # [30000, 128]
             clear_perturb_embedded_table = perturb_embedding_table * (1 - input_ids_with_shape)
             # 更新为0之后再添加这次的扰动
-            unique_input_ids, _, unique_input_ids_counts = tf.unique(
+            unique_input_ids, _, unique_input_ids_counts = tf.unique_with_counts(
                 flat_input_ids)  # 每一个字只更新一次。不然出现次数太多，扰动太大。
             flat_perturb = tf.reshape(perturb_embedding, [-1, embedding_size])
             perturb_embedding_with_shape = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), flat_perturb,
                                                          [vocab_size, embedding_size])  # [30000,128]
+            print("perturb_embedding_with_shape", perturb_embedding_with_shape.shape)
 
             def avg_perturb(idx, count):
                 count = tf.cast(count, tf.float32)
