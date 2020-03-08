@@ -1754,15 +1754,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             flat_perturb = tf.reshape(perturb_embedding, [-1, embedding_size])
             perturb_embedding_with_shape = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), flat_perturb,
                                                          [vocab_size, embedding_size])  # [30000,128]
-            # perturb_embedding_multiple = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]),
-            #                                            1. / tf.cast(unique_input_ids_counts, tf.float32),
-            #                                            [vocab_size])  # [30000]
-            # perturb_embedding_multiple = tf.where(tf.equal(perturb_embedding_multiple, 0),
-            #                                       tf.ones_like(perturb_embedding_multiple),
-            #                                       perturb_embedding_multiple)
-            # perturb_embedding_multiple = tf.tile(tf.expand_dims(perturb_embedding_multiple, -1), [1, embedding_size])
-            # print("perturb_embedding_multiple", perturb_embedding_multiple)
-            # perturb_embedding_with_shape *= perturb_embedding_multiple
+            perturb_embedding_multiple = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]),
+                                                       tf.ones_like(input_ids, dtype=tf.float32),
+                                                       [vocab_size])  # [30000]
+            perturb_embedding_multiple = tf.where(tf.equal(perturb_embedding_multiple, 0),
+                                                  tf.ones_like(perturb_embedding_multiple),
+                                                  1. / perturb_embedding_multiple)
+            perturb_embedding_multiple = tf.tile(tf.expand_dims(perturb_embedding_multiple, -1), [1, embedding_size])
+            print("perturb_embedding_multiple", perturb_embedding_multiple)
+            perturb_embedding_with_shape *= perturb_embedding_multiple
 
             # def avg_perturb(tensors):
             #     idx = tensors[0]
