@@ -1634,7 +1634,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
-            # loss_rate = tf.cond(tf.less(random, 0.3), lambda: loss_rate, lambda: 0.15)
+            loss_rate = tf.cond(tf.less(random, 0.5), lambda: loss_rate, lambda: 0.15)
             perturb_embedded_inputs = tf.cond(tf.less(random, 0.5),
                                               lambda: perturb_embedded_inputs,
                                               lambda: tf.zeros_like(perturb_embedded_inputs))
