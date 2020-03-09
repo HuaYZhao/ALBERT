@@ -1618,7 +1618,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedding_table = tf.get_variable("embedding_table",
                                                       initializer=lambda: tf.zeros(shape=[vocab_size, embedding_size],
                                                                                    dtype=tf.float32),
-                                                      trainable=True,
+                                                      trainable=False,
                                                       dtype=tf.float32)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
