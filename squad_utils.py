@@ -1626,8 +1626,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         flat_input_ids = tf.reshape(input_ids, [-1])
         one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)  # [5*384, 30000]
         loss_rate = 1.
-        global_step = tf.train.get_global_step()
-        global_step_op = tf.no_op()
+        growth_step = True
         # 取扰动的embedding
         if is_training and np.random.rand() < 0.5:
             output = tf.matmul(one_hot_input_ids, perturb_embedding_table)
@@ -1635,7 +1634,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
             loss_rate = 0.15
-            global_step_op = global_step.assign(global_step - 1)
+            growth_step = False
         else:
             perturb_embedded_inputs = None
 
@@ -1791,9 +1790,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, growth_step=growth_step)
 
-            train_op = tf.group(train_op, assign_op, global_step_op)
+            train_op = tf.group(train_op, assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
