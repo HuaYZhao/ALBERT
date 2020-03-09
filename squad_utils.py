@@ -1626,6 +1626,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         flat_input_ids = tf.reshape(input_ids, [-1])
         one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)  # [5*384, 30000]
         loss_rate = 1.
+        random = tf.random_uniform([], 0, 1, dtype=tf.float32)
         growth_step = True
         # 取扰动的embedding
         if is_training and np.random.rand() < 0.5:
@@ -1633,8 +1634,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
                                                  [input_shape[0], input_shape[1], embedding_size])
-            loss_rate = 0.15
-            growth_step = False
+            loss_rate = tf.cond(tf.less(random, 0.5), lambda: loss_rate, lambda: 0.15)
+            perturb_embedded_inputs = tf.cond(tf.less(random, 0.5),
+                                              lambda: perturb_embedded_inputs,
+                                              lambda: tf.zeros_like(perturb_embedded_inputs))
         else:
             perturb_embedded_inputs = None
 
