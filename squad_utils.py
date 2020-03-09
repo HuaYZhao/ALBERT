@@ -1629,7 +1629,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         random = tf.random_uniform([], 0, 1, dtype=tf.float32)
         growth_step = True
         # 取扰动的embedding
-        if is_training and np.random.rand() < 0.5:
+        if is_training:
             output = tf.matmul(one_hot_input_ids, perturb_embedding_table)
             input_shape = modeling.get_shape_list(input_ids)
             perturb_embedded_inputs = tf.reshape(output,
