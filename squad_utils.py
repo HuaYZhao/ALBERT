@@ -1644,6 +1644,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         else:
             perturb_embedded_inputs = None
 
+
         outputs = create_v2_model(
             albert_config=albert_config,
             is_training=is_training,
