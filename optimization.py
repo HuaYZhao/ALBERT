@@ -110,7 +110,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # But if you use a different optimizer, you should probably take this line
     # out.
     increase_step = tf.cond(growth_step, lambda: 1, lambda: 0)
-    new_global_step = global_step + increase_step
+    new_global_step = global_step + tf.cast(increase_step, tf.int64)
     train_op = tf.group(train_op, [global_step.assign(new_global_step)])
     return train_op
 
