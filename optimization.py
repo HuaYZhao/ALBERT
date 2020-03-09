@@ -109,9 +109,10 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # However, neither `AdamWeightDecayOptimizer` nor `LAMBOptimizer` do this.
     # But if you use a different optimizer, you should probably take this line
     # out.
-    if growth_step:
-        new_global_step = global_step + 1
-        train_op = tf.group(train_op, [global_step.assign(new_global_step)])
+    new_global_step = global_step + 1
+
+    step_op = tf.cond(growth_step, lambda: global_step.assign(new_global_step), lambda: tf.no_op())
+    train_op = tf.group(train_op, [step_op])
     return train_op
 
 
