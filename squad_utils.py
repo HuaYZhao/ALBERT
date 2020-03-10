@@ -1722,7 +1722,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 outputs["word_embedding_output"])
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            embedded_inputs = outputs["word_embedding_output"] + perturb
+            embedded_inputs = perturb
 
             outputs_adv = create_v2_model(
                 albert_config=albert_config,
