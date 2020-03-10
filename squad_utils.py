@@ -1714,53 +1714,53 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # tf.reset_default_graph()
 
             # Adds gradient to embedding and recomputes classification loss.
-            def _scale_l2(x, norm_length):
-                # shape(x) = (batch, num_timesteps, d)
-                # Divide x by max(abs(x)) for a numerically stable L2 norm.
-                # 2norm(x) = a * 2norm(x/a)
-                # Scale over the full sequence, dims (1, 2)
-                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-                l2_norm = alpha * tf.sqrt(
-                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-                x_unit = x / l2_norm
-                return norm_length * x_unit
-
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            embedded_inputs = perturb
-
-            outputs_adv = create_v2_model(
-                albert_config=albert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                segment_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings,
-                features=features,
-                max_seq_length=max_seq_length,
-                start_n_top=start_n_top,
-                end_n_top=end_n_top,
-                dropout_prob=dropout_prob,
-                hub_module=hub_module,
-                embedded_inputs=embedded_inputs)
-
-            adv_loss = get_loss(outputs_adv, features)
-
-            grads_adv = tf.gradients(0.15 * adv_loss, tvars)
-            grads_adv = [g for v, g in zip(tvars, grads_adv)]
-            # This is how the model was pre-trained.
-            (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
-            grads_adv = {v: g for v, g in zip(tvars, grads_adv)}
-
-            merge_grads = list(zip([grads[v] + grads_adv[v] for v in tvars], tvars))
+            # def _scale_l2(x, norm_length):
+            #     # shape(x) = (batch, num_timesteps, d)
+            #     # Divide x by max(abs(x)) for a numerically stable L2 norm.
+            #     # 2norm(x) = a * 2norm(x/a)
+            #     # Scale over the full sequence, dims (1, 2)
+            #     alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+            #     l2_norm = alpha * tf.sqrt(
+            #         tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+            #     x_unit = x / l2_norm
+            #     return norm_length * x_unit
+            #
+            # grad, = tf.gradients(
+            #     total_loss,
+            #     outputs["word_embedding_output"])
+            # grad = tf.stop_gradient(grad)
+            # perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
+            # embedded_inputs = perturb
+            #
+            # outputs_adv = create_v2_model(
+            #     albert_config=albert_config,
+            #     is_training=is_training,
+            #     input_ids=input_ids,
+            #     input_mask=input_mask,
+            #     segment_ids=segment_ids,
+            #     use_one_hot_embeddings=use_one_hot_embeddings,
+            #     features=features,
+            #     max_seq_length=max_seq_length,
+            #     start_n_top=start_n_top,
+            #     end_n_top=end_n_top,
+            #     dropout_prob=dropout_prob,
+            #     hub_module=hub_module,
+            #     embedded_inputs=embedded_inputs)
+            #
+            # adv_loss = get_loss(outputs_adv, features)
+            #
+            # grads_adv = tf.gradients(0.15 * adv_loss, tvars)
+            # grads_adv = [g for v, g in zip(tvars, grads_adv)]
+            # # This is how the model was pre-trained.
+            # (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
+            # grads_adv = {v: g for v, g in zip(tvars, grads_adv)}
+            #
+            # merge_grads = list(zip([grads[v] + grads_adv[v] for v in tvars], tvars))
 
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                list(zip(grads_adv, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=tf.constant(True, dtype=tf.bool))
 
             print("all ops", tf.get_default_graph().get_operations())
