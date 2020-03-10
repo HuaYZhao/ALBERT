@@ -1759,7 +1759,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                merge_grads, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+                grads, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=tf.constant(True, dtype=tf.bool))
 
             print("all ops", tf.get_default_graph().get_operations())
