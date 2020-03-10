@@ -1710,7 +1710,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # This is how the model was pre-trained.
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
             grads = {v: g for v, g in zip(tvars, grads)}
-            tf.reset_default_graph()
+            # tf.reset_default_graph()
 
             # Adds gradient to embedding and recomputes classification loss.
             def _scale_l2(x, norm_length):
@@ -1754,7 +1754,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
             grads_adv = {v: g for v, g in zip(tvars, grads_adv)}
 
-            merge_grads = list(zip([grads[v] + grads_adv[v] for v in tvars],tvars))
+            merge_grads = list(zip([grads[v] + grads_adv[v] for v in tvars], tvars))
 
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
