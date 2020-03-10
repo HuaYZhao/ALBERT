@@ -1612,8 +1612,36 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
+        vocab_size = albert_config.vocab_size
+        embedding_size = albert_config.embedding_size
+        with tf.variable_scope("perturb_embedding_table", reuse=tf.AUTO_REUSE):
+            perturb_embedding_table = tf.get_variable("embedding_table",
+                                                      initializer=lambda: tf.zeros(shape=[vocab_size, embedding_size],
+                                                                                   dtype=tf.float32),
+                                                      trainable=False,
+                                                      dtype=tf.float32)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+
+        flat_input_ids = tf.reshape(input_ids, [-1])
+        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)  # [5*384, 30000]
+        loss_rate = 1.
+        random = tf.random_uniform([], 0, 1, dtype=tf.float32)
+        growth_step = tf.constant(True, dtype=tf.bool)
+        perturb_embedded_inputs = None
+        # 取扰动的embedding
+        if is_training:
+            output = tf.matmul(one_hot_input_ids, perturb_embedding_table)
+            input_shape = modeling.get_shape_list(input_ids)
+            perturb_embedded_inputs = tf.reshape(output,
+                                                 [input_shape[0], input_shape[1], embedding_size])
+            loss_rate = tf.cond(tf.less(random, 0.5), lambda: loss_rate, lambda: 0.5)
+            perturb_embedded_inputs = tf.cond(tf.less(random, 0.5),
+                                              lambda: perturb_embedded_inputs,
+                                              lambda: tf.zeros_like(perturb_embedded_inputs))
+            # growth_step = tf.cond(tf.less(random, 0.5),
+            #                       lambda: tf.constant(False, dtype=tf.bool),
+            #                       lambda: growth_step)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1628,22 +1656,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module,
-            embedded_inputs=None)
-
-        outputs2 = create_v2_model(
-            albert_config=albert_config,
-            is_training=is_training,
-            input_ids=input_ids,
-            input_mask=input_mask,
-            segment_ids=segment_ids,
-            use_one_hot_embeddings=use_one_hot_embeddings,
-            features=features,
-            max_seq_length=max_seq_length,
-            start_n_top=start_n_top,
-            end_n_top=end_n_top,
-            dropout_prob=dropout_prob,
-            hub_module=hub_module,
-            embedded_inputs=None)
+            embedded_inputs=perturb_embedded_inputs)
 
         tvars = tf.trainable_variables()
 
@@ -1739,6 +1752,29 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
             perturb_embedding = perturb
 
+            # 之前取完之后,相应的位置要更新为0
+            input_ids_with_shape = tf.tile(
+                tf.expand_dims(tf.cast(tf.greater(tf.reduce_sum(one_hot_input_ids, axis=0), 0), tf.float32), -1),
+                [1, embedding_size])  # [30000, 128]
+            clear_perturb_embedded_table = perturb_embedding_table * (1 - input_ids_with_shape)
+            # 更新为0之后再添加这次的扰动
+            unique_input_ids, _ = tf.unique(
+                flat_input_ids)  # 每一个字只更新一次。不然出现次数太多，扰动太大。
+            flat_perturb = tf.reshape(perturb_embedding, [-1, embedding_size])
+            perturb_embedding_with_shape = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]), flat_perturb,
+                                                         [vocab_size, embedding_size])  # [30000,128]
+            perturb_embedding_multiple = tf.scatter_nd(tf.reshape(input_ids, [-1, 1]),
+                                                       tf.ones_like(flat_input_ids, dtype=tf.float32),
+                                                       [vocab_size])  # [30000]
+            perturb_embedding_multiple = tf.where(tf.equal(perturb_embedding_multiple, 0),
+                                                  tf.ones_like(perturb_embedding_multiple),
+                                                  1. / perturb_embedding_multiple)
+            perturb_embedding_multiple = tf.tile(tf.expand_dims(perturb_embedding_multiple, -1), [1, embedding_size])
+            perturb_embedding_with_shape *= perturb_embedding_multiple
+
+            final_perturb_embedded_table = clear_perturb_embedded_table + perturb_embedding_with_shape
+            assign_op = tf.assign(perturb_embedding_table, final_perturb_embedded_table)
+
             # outputs_adv = create_v2_model(
             #     albert_config=albert_config,
             #     is_training=is_training,
@@ -1759,8 +1795,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-                growth_step=tf.constant(True, dtype=tf.bool))
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, growth_step=growth_step)
+
+            train_op = tf.group(train_op, assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
