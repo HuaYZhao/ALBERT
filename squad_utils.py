@@ -1718,7 +1718,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 total_loss += regression_loss * 0.5
                 return total_loss
 
-            total_loss = loss_rate * get_loss(outputs, features)
+            total_loss = get_loss(outputs, features)
 
             # Adds gradient to embedding and recomputes classification loss.
             def _scale_l2(x, norm_length):
