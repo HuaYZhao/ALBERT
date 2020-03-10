@@ -1630,21 +1630,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             hub_module=hub_module,
             embedded_inputs=None)
 
-        outputs2 = create_v2_model(
-            albert_config=albert_config,
-            is_training=is_training,
-            input_ids=input_ids,
-            input_mask=input_mask,
-            segment_ids=segment_ids,
-            use_one_hot_embeddings=use_one_hot_embeddings,
-            features=features,
-            max_seq_length=max_seq_length,
-            start_n_top=start_n_top,
-            end_n_top=end_n_top,
-            dropout_prob=dropout_prob,
-            hub_module=hub_module,
-            embedded_inputs=None)
-
         tvars = tf.trainable_variables()
 
         initialized_variable_names = {}
@@ -1737,22 +1722,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 outputs["word_embedding_output"])
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            perturb_embedding = perturb
+            embedded_inputs = outputs["word_embedding_output"] + perturb
 
-            # outputs_adv = create_v2_model(
-            #     albert_config=albert_config,
-            #     is_training=is_training,
-            #     input_ids=input_ids,
-            #     input_mask=input_mask,
-            #     segment_ids=segment_ids,
-            #     use_one_hot_embeddings=use_one_hot_embeddings,
-            #     features=features,
-            #     max_seq_length=max_seq_length,
-            #     start_n_top=start_n_top,
-            #     end_n_top=end_n_top,
-            #     dropout_prob=dropout_prob,
-            #     hub_module=hub_module,
-            #     embedded_inputs=embedded_inputs)
+            outputs_adv = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=embedded_inputs)
             #
             # adv_loss = get_loss(outputs_adv, features)
             #
