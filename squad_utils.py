@@ -1705,6 +1705,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = get_loss(outputs, features)
 
+            grads = tf.gradients(total_loss, tvars)
+            grads = [g for v, g in zip(tvars, grads)]
+            # This is how the model was pre-trained.
+            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+            grads = {v: g for v, g in zip(tvars, grads)}
+            tf.reset_default_graph()
+
             # Adds gradient to embedding and recomputes classification loss.
             def _scale_l2(x, norm_length):
                 # shape(x) = (batch, num_timesteps, d)
@@ -1741,10 +1748,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             adv_loss = get_loss(outputs_adv, features)
 
+            grads_adv = tf.gradients(0.15 * adv_loss, tvars)
+            grads_adv = [g for v, g in zip(tvars, grads_adv)]
+            # This is how the model was pre-trained.
+            (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
+            grads_adv = {v: g for v, g in zip(tvars, grads_adv)}
+
+            merge_grads = list(zip([grads[v] + grads_adv[v] for v in tvars],tvars))
+
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+                merge_grads, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=tf.constant(True, dtype=tf.bool))
 
             print("all ops", tf.get_default_graph().get_operations())
