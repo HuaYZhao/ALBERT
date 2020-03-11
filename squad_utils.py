@@ -1787,9 +1787,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 del before_loss
                 return loss
 
-            merge_loss = tf.cond(tf.equal(adv_step, 0),
-                                 lambda: save_loss,
-                                 lambda: clear_loss)
+            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, clear_loss)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
