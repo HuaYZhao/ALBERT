@@ -1756,11 +1756,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
             def save_to_collection():
+                assert len(tf.get_collection("temp_gvs")) == 0
                 gvs = {v: g for g, v in zip(grads, tvars)}
                 tf.add_to_collection("temp_gvs", gvs)
                 return gvs.values()
 
             def clear_collection():
+                assert len(tf.get_collection("temp_gvs")) == 1
                 temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                 gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
                 del temp_gvs
@@ -1772,13 +1774,27 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             train_op = tf.cond(tf.equal(adv_step, 0),
-                               lambda: tf.group(tf.no_op(), perturb_assign_op, adv_assign_op),
+                               lambda: tf.group(perturb_assign_op, adv_assign_op),
                                lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
+
+            def save_loss():
+                tf.add_to_collection("my_loss", total_loss)
+                return 0.
+
+            def clear_loss():
+                before_loss = tf.get_collection_ref("my_loss")[0]
+                loss = total_loss + before_loss
+                del before_loss
+                return loss
+
+            merge_loss = tf.cond(tf.equal(adv_step, 0),
+                                 lambda: save_loss,
+                                 lambda: clear_loss)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=total_loss,
+                loss=merge_loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
