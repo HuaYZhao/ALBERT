@@ -1605,6 +1605,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
                         end_n_top, dropout_prob, hub_module):
     """Returns `model_fn` closure for TPUEstimator."""
+    adv_flag = 1
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
         """The `model_fn` for TPUEstimator."""
@@ -1621,6 +1622,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedding_size = albert_config.embedding_size
         loss_rate = 1.
         embedded_inputs = None
+        nonlocal adv_flag
+        adv_flag += 1
 
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
@@ -1800,6 +1803,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         return output_spec
 
+    print(adv_flag)
     return model_fn
 
 
