@@ -1619,7 +1619,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         segment_ids = features["segment_ids"]
         bsz = modeling.get_shape_list(input_ids)[0]
         embedding_size = albert_config.embedding_size
-        loss_rate = tf.constant(1., dtype=tf.float32)
+        loss_rate = 1.
         embedded_inputs = None
 
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
