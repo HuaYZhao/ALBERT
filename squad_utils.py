@@ -1766,6 +1766,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 train_op = tf.no_op()
             else:
                 last_grads_vars = at_helper.grads_vars
+                assert last_grads_vars
                 now_grads_vars = at_helper.save_grads(total_loss)
                 grads = [last_grads_vars[v] + now_grads_vars[v] for v in tvars]
                 grads_vars = list(zip(grads, tvars))
