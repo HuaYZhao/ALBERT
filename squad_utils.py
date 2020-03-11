@@ -1636,10 +1636,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        if is_training:
-            embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
-                                      lambda: tf.zeros_like(perturb_embedding_inputs))
-            loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
+        # if is_training:
+        #     embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
+        #                               lambda: tf.zeros_like(perturb_embedding_inputs))
+        #     loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1654,7 +1654,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module,
-            embedded_inputs=embedded_inputs)
+            embedded_inputs=None)
 
         tvars = tf.trainable_variables()
 
@@ -1748,14 +1748,33 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 outputs["word_embedding_output"])
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
-            adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+
+            outputs_adv = create_v2_model(
+                albert_config=albert_config,
+                is_training=is_training,
+                input_ids=input_ids,
+                input_mask=input_mask,
+                segment_ids=segment_ids,
+                use_one_hot_embeddings=use_one_hot_embeddings,
+                features=features,
+                max_seq_length=max_seq_length,
+                start_n_top=start_n_top,
+                end_n_top=end_n_top,
+                dropout_prob=dropout_prob,
+                hub_module=hub_module,
+                embedded_inputs=perturb)
+            # perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+            # adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+
+            adv_loss = get_loss(outputs_adv, features)
+
+            total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-                growth_step=tf.equal(adv_step, 1))
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,)
+                # growth_step=tf.equal(adv_step, 1))
 
-            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
+            # train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
