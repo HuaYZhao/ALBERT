@@ -707,7 +707,7 @@ def input_fn_builder(input_file, seq_length, is_training,
 
         rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
 
-        return rd
+        return d
 
     return input_fn
 
@@ -1599,10 +1599,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     return return_dict
 
-
-from hook.gradient_hook import AdversarialTrainingHelper
-
-
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1624,28 +1620,25 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedding_size = albert_config.embedding_size
         loss_rate = 1.
         embedded_inputs = None
-        at_helper = AdversarialTrainingHelper()
 
-        # with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
-        #     perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
-        #                                                initializer=lambda: tf.zeros(
-        #                                                    shape=[bsz, max_seq_length, embedding_size],
-        #                                                    dtype=tf.float32),
-        #                                                trainable=False,
-        #                                                dtype=tf.float32)
-        #     adv_step = tf.get_variable("adv_step",
-        #                                initializer=lambda: tf.constant(0, dtype=tf.int32),
-        #                                trainable=False,
-        #                                dtype=tf.int32)
+        with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
+            perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
+                                                       initializer=lambda: tf.zeros(
+                                                           shape=[bsz, max_seq_length, embedding_size],
+                                                           dtype=tf.float32),
+                                                       trainable=False,
+                                                       dtype=tf.float32)
+            adv_step = tf.get_variable("adv_step",
+                                       initializer=lambda: tf.constant(0, dtype=tf.int32),
+                                       trainable=False,
+                                       dtype=tf.int32)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        # if is_training:
-        #     embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
-        #                               lambda: tf.zeros_like(perturb_embedding_inputs))
-        #     loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
         if is_training:
-            loss_rate = 0.125 if at_helper.is_adv_step else 0.875
+            embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
+                                      lambda: tf.zeros_like(perturb_embedding_inputs))
+            loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1660,7 +1653,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module,
-            embedded_inputs=at_helper.perturb)
+            embedded_inputs=embedded_inputs)
 
         tvars = tf.trainable_variables()
 
@@ -1737,45 +1730,32 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = loss_rate * get_loss(outputs, features)
 
-            at_helper.compute_embedding_perturb(total_loss, outputs["word_embedding_output"])
+            # Adds gradient to embedding and recomputes classification loss.
+            def _scale_l2(x, norm_length):
+                # shape(x) = (batch, num_timesteps, d)
+                # Divide x by max(abs(x)) for a numerically stable L2 norm.
+                # 2norm(x) = a * 2norm(x/a)
+                # Scale over the full sequence, dims (1, 2)
+                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                l2_norm = alpha * tf.sqrt(
+                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                x_unit = x / l2_norm
+                return norm_length * x_unit
 
-            # # Adds gradient to embedding and recomputes classification loss.
-            # def _scale_l2(x, norm_length):
-            #     # shape(x) = (batch, num_timesteps, d)
-            #     # Divide x by max(abs(x)) for a numerically stable L2 norm.
-            #     # 2norm(x) = a * 2norm(x/a)
-            #     # Scale over the full sequence, dims (1, 2)
-            #     alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-            #     l2_norm = alpha * tf.sqrt(
-            #         tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-            #     x_unit = x / l2_norm
-            #     return norm_length * x_unit
-            #
-            # grad, = tf.gradients(
-            #     total_loss,
-            #     outputs["word_embedding_output"])
-            # grad = tf.stop_gradient(grad)
-            # perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
+            grad, = tf.gradients(
+                total_loss,
+                outputs["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            # perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
-            # adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+            perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+            adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
-            # total_loss = total_loss * 0.875 + adv_loss * 0.125
-            train_op = tf.no_op()
-            if not at_helper.is_adv_step:
-                at_helper.save_grads(total_loss)
-            else:
-                last_grads_vars = at_helper.grads_vars
-                assert last_grads_vars
-                now_grads_vars = at_helper.save_grads(total_loss)
-                grads = [last_grads_vars[v] + now_grads_vars[v] for v in tvars]
-                grads_vars = list(zip(grads, tvars))
+            train_op = optimization.create_optimizer(
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+            growth_step=tf.equal(adv_step, 1))
 
-                train_op = optimization.create_optimizer(
-                    grads_vars, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-            # growth_step=tf.equal(adv_step, 1))
-
-            # train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
+            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
