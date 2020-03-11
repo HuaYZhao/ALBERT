@@ -1761,9 +1761,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
             # total_loss = total_loss * 0.875 + adv_loss * 0.125
+            train_op = tf.no_op()
             if not at_helper.is_adv_step:
                 at_helper.save_grads(total_loss)
-                train_op = tf.no_op()
             else:
                 last_grads_vars = at_helper.grads_vars
                 assert last_grads_vars
@@ -1781,7 +1781,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
-                train_op=tf.no_op(),
+                train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
