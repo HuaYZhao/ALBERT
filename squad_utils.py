@@ -1758,18 +1758,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def save_to_collection():
                 gvs = {v: g for g, v in zip(grads, tvars)}
                 tf.add_to_collection("temp_gvs", gvs)
-                return list(zip(list(gvs.values()), tvars))
+                return gvs.values()
 
             def clear_collection():
                 temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                 gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
                 del temp_gvs
-                return list(zip(list(gvs.values()), tvars))
+                return gvs.values()
 
-            grads_vars = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
+            grads = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
 
             train_op = optimization.create_optimizer(
-                grads_vars, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             train_op = tf.cond(tf.equal(adv_step, 0),
                                lambda: tf.group(tf.no_op(), perturb_assign_op, adv_assign_op),
