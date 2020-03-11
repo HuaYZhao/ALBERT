@@ -1636,10 +1636,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        # if is_training:
-        #     embedded_inputs = tf.cond(adv_step, lambda: perturb_embedding_inputs,
-        #                               lambda: tf.zeros_like(perturb_embedding_inputs))
-        #     loss_rate = tf.cond(adv_step, lambda: 0.125, lambda: 0.875)
+        if is_training:
+            embedded_inputs = tf.cond(adv_step, lambda: perturb_embedding_inputs,
+                                      lambda: tf.zeros_like(perturb_embedding_inputs))
+            loss_rate = tf.cond(adv_step, lambda: 0.125, lambda: 0.875)
 
         outputs = create_v2_model(
             albert_config=albert_config,
