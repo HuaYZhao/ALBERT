@@ -26,8 +26,8 @@ import tensorflow.compat.v1 as tf
 from tensorflow.contrib import tpu as contrib_tpu
 
 
-def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
-                     optimizer="adamw", poly_power=1.0, start_warmup_step=0, growth_step=tf.constant(True)):
+def create_optimizer(grads, init_lr, num_train_steps, num_warmup_steps, use_tpu,
+                     optimizer="adamw", poly_power=1.0, start_warmup_step=0):
     """Creates an optimizer training op."""
     global_step = tf.train.get_or_create_global_step()
 
@@ -94,23 +94,26 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     if use_tpu:
         optimizer = contrib_tpu.CrossShardOptimizer(optimizer)
 
-    tvars = tf.trainable_variables()
-    grads = tf.gradients(loss, tvars)
-    grads = [g * 100 if v.name.startswith("slqa") or v.name.startswith("co-attention") else g for v, g in
-             zip(tvars, grads)]
+    # tvars = tf.trainable_variables()
+    # grads = tf.gradients(loss, tvars)
+    # grads = [g * 100 if v.name.startswith("slqa") or v.name.startswith("co-attention") else g for v, g in
+    #          zip(tvars, grads)]
+    #
+    # # This is how the model was pre-trained.
+    # (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-    # This is how the model was pre-trained.
-    (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-
+    # train_op = optimizer.apply_gradients(
+    #     list(zip(grads, tvars)), global_step=global_step)
     train_op = optimizer.apply_gradients(
-        list(zip(grads, tvars)), global_step=global_step)
+        grads, global_step=global_step)
 
     # Normally the global step update is done inside of `apply_gradients`.
     # However, neither `AdamWeightDecayOptimizer` nor `LAMBOptimizer` do this.
     # But if you use a different optimizer, you should probably take this line
     # out.
-    increase_step = tf.cond(growth_step, lambda: 1, lambda: 0)
-    new_global_step = global_step + tf.cast(increase_step, tf.int64)
+    # increase_step = tf.cond(growth_step, lambda: 1, lambda: 0)
+    # new_global_step = global_step + tf.cast(increase_step, tf.int64)
+    new_global_step = global_step + 1
     train_op = tf.group(train_op, [global_step.assign(new_global_step)])
     return train_op
 

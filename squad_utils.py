@@ -1752,12 +1752,28 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
             adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
-            train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-                growth_step=tf.equal(adv_step, 1))
+            grads = tf.gradients(total_loss, tvars)
+            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
-            train_op = tf.cond(tf.equal(adv_step, 1), lambda: tf.no_op(), lambda: tf.no_op())
+            def save_to_collection():
+                gvs = {v: g for g, v in zip(grads, tvars)}
+                tf.add_to_collection("temp_gvs", gvs)
+                return list(zip(list(gvs.values()), tvars))
+
+            def clear_collection():
+                temp_gvs = tf.get_collection_ref("temp_gvs")[0]
+                gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
+                del temp_gvs
+                return list(zip(list(gvs.values()), tvars))
+
+            grads_vars = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
+
+            train_op = optimization.create_optimizer(
+                grads_vars, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+
+            train_op = tf.cond(tf.equal(adv_step, 0),
+                               lambda: tf.group(tf.no_op(), perturb_assign_op, adv_assign_op),
+                               lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
