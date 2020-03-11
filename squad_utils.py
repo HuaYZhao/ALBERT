@@ -1621,6 +1621,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         embedding_size = albert_config.embedding_size
         loss_rate = 1.
         embedded_inputs = None
+        adv_step = tf.constant(False)
 
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
@@ -1629,10 +1630,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                                            dtype=tf.float32),
                                                        trainable=False,
                                                        dtype=tf.float32)
-            adv_step = tf.get_variable("adv_step",
-                                       initializer=lambda: tf.constant(False, dtype=bool),
-                                       trainable=False,
-                                       dtype=tf.bool)
+            # adv_step = tf.get_variable("adv_step",
+            #                            initializer=lambda: tf.constant(False, dtype=bool),
+            #                            trainable=False,
+            #                            dtype=tf.bool)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
