@@ -1770,13 +1770,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
 
-            train_op = optimization.create_optimizer(
-                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-                growth_step=tf.equal(adv_step, 1))
+            train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
+                               lambda: optimization.create_optimizer(
+                                   list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
 
             group_ops = tf.cond(tf.equal(adv_step, 0),
-                               lambda: tf.group(grads, perturb_assign_op, adv_assign_op),
-                               lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
+                                lambda: tf.group(perturb_assign_op, adv_assign_op),
+                                lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
 
             def save_loss():
                 tf.add_to_collection("my_loss", total_loss)
