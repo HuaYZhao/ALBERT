@@ -1630,6 +1630,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                                        dtype=tf.float32)
             adv_step = tf.get_variable("adv_step",
                                        initializer=lambda: tf.constant(False, dtype=bool),
+                                       trainable=False,
                                        dtype=tf.bool)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
