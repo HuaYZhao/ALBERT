@@ -694,7 +694,7 @@ def input_fn_builder(input_file, seq_length, is_training,
         d = tf.data.TFRecordDataset(input_file)
         if is_training:
             d = d.repeat()
-            d = d.shuffle(buffer_size=100)
+            d = d.shuffle(buffer_size=100, seed=1)
 
         d = d.apply(
             contrib_data.map_and_batch(
@@ -1640,7 +1640,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
                                       lambda: tf.zeros_like(perturb_embedding_inputs))
             loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
-            p_op = tf.print(input_ids)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1756,7 +1755,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=tf.equal(adv_step, 1))
 
-            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op, p_op)
+            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
