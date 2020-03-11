@@ -1774,7 +1774,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             train_op = tf.cond(tf.equal(adv_step, 0),
-                               lambda: tf.group(perturb_assign_op, adv_assign_op),
+                               lambda: tf.group(grads, perturb_assign_op, adv_assign_op),
                                lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
 
             def save_loss():
