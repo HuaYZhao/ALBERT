@@ -1772,7 +1772,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             train_op = optimization.create_optimizer(
                 list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-                grow_step=tf.equal(adv_step, 1))
+                growth_step=tf.equal(adv_step, 1))
 
             group_ops = tf.cond(tf.equal(adv_step, 0),
                                lambda: tf.group(grads, perturb_assign_op, adv_assign_op),
