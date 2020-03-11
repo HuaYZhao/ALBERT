@@ -1620,6 +1620,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         bsz = modeling.get_shape_list(input_ids)[0]
         embedding_size = albert_config.embedding_size
         loss_rate = tf.constant(1., dtype=tf.float32)
+        embedded_inputs = None
 
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
@@ -1635,12 +1636,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        if is_training:
-            embedded_inputs = tf.cond(adv_step, lambda: perturb_embedding_inputs,
-                                      lambda: tf.zeros_like(perturb_embedding_inputs))
-            loss_rate = tf.cond(adv_step, lambda: 0.125, lambda: 0.875)
-        else:
-            embedded_inputs = None
+        # if is_training:
+        #     embedded_inputs = tf.cond(adv_step, lambda: perturb_embedding_inputs,
+        #                               lambda: tf.zeros_like(perturb_embedding_inputs))
+        #     loss_rate = tf.cond(adv_step, lambda: 0.125, lambda: 0.875)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1732,24 +1731,24 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = loss_rate * get_loss(outputs, features)
 
-            # Adds gradient to embedding and recomputes classification loss.
-            def _scale_l2(x, norm_length):
-                # shape(x) = (batch, num_timesteps, d)
-                # Divide x by max(abs(x)) for a numerically stable L2 norm.
-                # 2norm(x) = a * 2norm(x/a)
-                # Scale over the full sequence, dims (1, 2)
-                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-                l2_norm = alpha * tf.sqrt(
-                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-                x_unit = x / l2_norm
-                return norm_length * x_unit
-
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
-            perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+            # # Adds gradient to embedding and recomputes classification loss.
+            # def _scale_l2(x, norm_length):
+            #     # shape(x) = (batch, num_timesteps, d)
+            #     # Divide x by max(abs(x)) for a numerically stable L2 norm.
+            #     # 2norm(x) = a * 2norm(x/a)
+            #     # Scale over the full sequence, dims (1, 2)
+            #     alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+            #     l2_norm = alpha * tf.sqrt(
+            #         tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+            #     x_unit = x / l2_norm
+            #     return norm_length * x_unit
+            #
+            # grad, = tf.gradients(
+            #     total_loss,
+            #     outputs["word_embedding_output"])
+            # grad = tf.stop_gradient(grad)
+            # perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
+            # perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
             # adv_assign_op = tf.assign(adv_step, ~adv_step)
 
             train_op = optimization.create_optimizer(
