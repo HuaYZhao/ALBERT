@@ -1771,8 +1771,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             total_loss = total_loss * 0.875 + adv_loss * 0.125
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,)
-                # growth_step=tf.equal(adv_step, 1))
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+                growth_step=tf.constant(True, tf.bool))
+            # growth_step=tf.equal(adv_step, 1))
 
             # train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
