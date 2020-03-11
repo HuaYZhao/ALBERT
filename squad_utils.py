@@ -702,12 +702,12 @@ def input_fn_builder(input_file, seq_length, is_training,
                 batch_size=batch_size,
                 drop_remainder=drop_remainder))
 
-        # ds = [d] * 2
-        # choice_dataset = tf.data.Dataset.range(len(ds)).repeat()
-        #
-        # rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
+        ds = [d] * 2
+        choice_dataset = tf.data.Dataset.range(len(ds)).repeat()
 
-        return d
+        rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
+
+        return rd
 
     return input_fn
 
@@ -1756,7 +1756,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=~adv_step)
 
-            train_op = tf.group(train_op, [perturb_assign_op, adv_assign_op])
+            train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
