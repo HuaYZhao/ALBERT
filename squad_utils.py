@@ -1599,6 +1599,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     return return_dict
 
+
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1753,9 +1754,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
-            growth_step=tf.equal(adv_step, 1))
+                growth_step=tf.equal(adv_step, 1))
 
             train_op = tf.group(train_op, perturb_assign_op, adv_assign_op)
+            train_op = tf.cond(tf.equal(adv_step, 1), lambda: tf.no_op(), lambda: tf.no_op())
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
