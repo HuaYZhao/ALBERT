@@ -1762,7 +1762,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 return gvs.values()
 
             def clear_collection():
-                assert len(tf.get_collection("temp_gvs")) == 1
+                assert len(tf.get_collection("temp_gvs")) == 0
                 temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                 gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
                 del temp_gvs
