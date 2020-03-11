@@ -702,12 +702,12 @@ def input_fn_builder(input_file, seq_length, is_training,
                 batch_size=batch_size,
                 drop_remainder=drop_remainder))
 
-        ds = [d] * 2
-        choice_dataset = tf.data.Dataset.range(len(ds)).repeat()
+        # ds = [d] * 2
+        # choice_dataset = tf.data.Dataset.range(len(ds)).repeat()
+        #
+        # rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
 
-        rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
-
-        return rd
+        return d
 
     return input_fn
 
