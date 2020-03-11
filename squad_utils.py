@@ -1756,7 +1756,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
                 growth_step=tf.constant(True, tf.bool))
 
-            train_op = tf.group(train_op, perturb_assign_op)
+            # train_op = tf.group(train_op, perturb_assign_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
