@@ -707,7 +707,7 @@ def input_fn_builder(input_file, seq_length, is_training,
 
         rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
 
-        return d
+        return rd
 
     return input_fn
 
