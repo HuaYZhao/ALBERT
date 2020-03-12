@@ -1868,16 +1868,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                lambda: optimization.create_optimizer(
                                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
 
-            with tf.control_dependencies([train_op]):
-                # adv_assign_op = tf.assign(adv_step, 1 - adv_step)
-                perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+            # with tf.control_dependencies([train_op]):
+            #     adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+            #     perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
 
             # group_ops = tf.cond(tf.equal(adv_step, 0),
             #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
             #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
-            group_ops = tf.cond(tf.equal(adv_step, 1),
-                                lambda: tf.group(perturb_assign_op),
-                                lambda: tf.group(train_op, perturb_assign_op))
 
             def save_loss():
                 loss = tf.assign(before_loss, total_loss)
