@@ -1668,8 +1668,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                                  trainable=False,
                                                  dtype=segment_ids.dtype)
             before_p_mask = tf.get_variable("before_p_mask",
-                                            initializer=lambda: tf.zeros_like(p_mask,
-                                                                              dtype=p_mask.dtype),
+                                            initializer=lambda: tf.zeros_like(p_mask, dtype=p_mask.dtype),
                                             trainable=False,
                                             dtype=p_mask.dtype)
             before_start_positions = tf.get_variable("before_start_positions",
@@ -1847,8 +1846,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
-
             grads = tf.gradients(total_loss, tvars)
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
@@ -1878,6 +1875,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             with tf.control_dependencies([train_op]):
                 adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+                perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
 
             group_ops = tf.cond(tf.equal(adv_step, 0),
                                 lambda: tf.group(perturb_assign_op, adv_assign_op),
