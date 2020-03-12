@@ -1618,11 +1618,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
         p_mask = features["p_mask"]
-        start_positions = features["start_positions"]
-        end_positions = features["end_positions"]
-        is_impossible = features["is_impossible"]
         bsz = modeling.get_shape_list(input_ids)[0]
         embedding_size = albert_config.embedding_size
+
+        is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+
+        if is_training:
+            start_positions = features["start_positions"]
+            end_positions = features["end_positions"]
+            is_impossible = features["is_impossible"]
+        else:
+            start_positions = tf.zeros([bsz], dtype=tf.int32)
+            end_positions = tf.zeros([bsz], dtype=tf.int32)
+            is_impossible = tf.zeros([bsz], dtype=tf.int32)
+
         loss_rate = 1.
         embedded_inputs = None
 
@@ -1708,8 +1717,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         features["start_positions"] = start_positions
         features["end_positions"] = end_positions
         features["is_impossible"] = is_impossible
-
-        is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
         if is_training:
             embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
