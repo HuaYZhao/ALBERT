@@ -1622,6 +1622,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         loss_rate = 1.
         embedded_inputs = None
 
+        with tf.Session() as sess:
+            sess.run(input_ids)
+
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
                                                        initializer=lambda: tf.zeros(
