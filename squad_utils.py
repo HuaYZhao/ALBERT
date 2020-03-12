@@ -703,7 +703,7 @@ def input_fn_builder(input_file, seq_length, is_training,
                 drop_remainder=drop_remainder))
 
         ds = [d] * 2
-        choice_dataset = tf.data.Dataset.range(len(ds)).repeat()
+        choice_dataset = tf.data.Dataset.from_tensor_slices([0] * 8 + [1] * 8).repeat()
 
         rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
 
