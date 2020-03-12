@@ -1623,7 +1623,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        if is_training:
+        if "start_positions" in features:
             start_positions = features["start_positions"]
             end_positions = features["end_positions"]
             is_impossible = features["is_impossible"]
