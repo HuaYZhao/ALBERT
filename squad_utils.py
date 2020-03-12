@@ -1864,9 +1864,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
-            train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
-                               lambda: optimization.create_optimizer(
-                                   list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
+            # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
+            #                    lambda: optimization.create_optimizer(
+            #                        list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
+            train_op = optimization.create_optimizer(
+                                   list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             # with tf.control_dependencies([train_op]):
             #     adv_assign_op = tf.assign(adv_step, 1 - adv_step)
