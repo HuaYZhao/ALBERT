@@ -1612,7 +1612,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         tf.logging.info("*** Features ***")
         for name in sorted(features.keys()):
             tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
-
+        print("batch_size:", params["batch_size"])
         unique_ids = features["unique_ids"]
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
