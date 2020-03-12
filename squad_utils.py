@@ -1600,9 +1600,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return return_dict
 
 
-step = 1
-
-
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1625,7 +1622,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         loss_rate = 1.
         embedded_inputs = None
 
-        with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
+        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
                                                        initializer=lambda: tf.zeros(
                                                            shape=[bsz, max_seq_length, embedding_size],
@@ -1636,6 +1633,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                        initializer=lambda: tf.constant(0, dtype=tf.int32),
                                        trainable=False,
                                        dtype=tf.int32)
+            before_loss = tf.get_variable("before_loss",
+                                          initializer=lambda: tf.constant(0, dtype=tf.float32),
+                                          trainable=False,
+                                          dtype=tf.float32)
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
@@ -1660,6 +1661,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             embedded_inputs=embedded_inputs)
 
         tvars = tf.trainable_variables()
+
+        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
+            before_grads = {v: tf.get_variable(f"{v.name}_grad",
+                                               initializer=tf.zeros_like(v, dtype=tf.float32),
+                                               trainable=False,
+                                               dtype=tf.float32)
+                            for v in tvars}
 
         initialized_variable_names = {}
         scaffold_fn = None
@@ -1757,26 +1765,30 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grads = tf.gradients(total_loss, tvars)
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-            def save_to_collection():
-                with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 0)]):
-                    gvs = {v: g for g, v in zip(grads, tvars)}
-                    tf.add_to_collection("temp_gvs", gvs)  # 永远只做一次
-                    return gvs.values()
+            def save_grads():
+                new_grads = []
+                gvs = {v: g for g, v in zip(grads, tvars)}
+                for v in tvars:
+                    b_g = before_grads[v]
+                    new_grad = tf.assign(b_g, gvs[v])
+                    new_grads.append(new_grad)
+                return new_grads
 
-            def clear_collection():
-                global step
-                with tf.control_dependencies([tf.assert_equal(step, 1)]):
-                    temp_gvs = tf.get_collection_ref("temp_gvs")[0]
-                    gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
-                    step += 1
-                    # del temp_gvs
-                    return gvs.values()
+            def sum_grads():
+                new_grads = []
+                gvs = {v: g for g, v in zip(grads, tvars)}
+                for v in tvars:
+                    b_g = before_grads[v]
+                    new_grad = gvs[v] + b_g
+                    new_grads.append(new_grad)
+                return new_grads
 
-            grads = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
+            grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
                                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
+
             with tf.control_dependencies([train_op]):
                 adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
@@ -1785,16 +1797,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                 lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
 
             def save_loss():
-                tf.add_to_collection("my_loss", total_loss)
-                return 0.
-
-            def clear_loss():
-                before_loss = tf.get_collection_ref("my_loss")[0]
-                loss = total_loss + before_loss
-                del before_loss
+                loss = tf.assign(before_loss, total_loss)
                 return loss
 
-            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, clear_loss)
+            def sum_loss():
+                loss = total_loss + before_loss
+                return loss
+
+            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
