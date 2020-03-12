@@ -1750,29 +1750,30 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
             perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
-            adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
             grads = tf.gradients(total_loss, tvars)
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
             def save_to_collection():
-                assert len(tf.get_collection("temp_gvs")) == 0
-                gvs = {v: g for g, v in zip(grads, tvars)}
-                tf.add_to_collection("temp_gvs", gvs)
-                return gvs.values()
+                with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 0)]):
+                    gvs = {v: g for g, v in zip(grads, tvars)}
+                    tf.add_to_collection("temp_gvs", gvs)
+                    return gvs.values()
 
             def clear_collection():
                 with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 1)]):
                     temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                     gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
                     # del temp_gvs
-                return gvs.values()
+                    return gvs.values()
 
             grads = tf.cond(tf.equal(adv_step, 0), save_to_collection, clear_collection)
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
                                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
+            with tf.control_dependencies([train_op]):
+                adv_assign_op = tf.assign(adv_step, 1 - adv_step)
 
             group_ops = tf.cond(tf.equal(adv_step, 0),
                                 lambda: tf.group(perturb_assign_op, adv_assign_op),
