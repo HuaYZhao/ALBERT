@@ -1623,14 +1623,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        if "start_positions" in features:
-            start_positions = features["start_positions"]
-            end_positions = features["end_positions"]
-            is_impossible = features["is_impossible"]
-        else:
-            start_positions = tf.zeros([bsz], dtype=tf.int32)
-            end_positions = tf.zeros([bsz], dtype=tf.int32)
-            is_impossible = tf.zeros([bsz], dtype=tf.int32)
+        start_positions = features.get("start_positions", tf.zeros([bsz], dtype=tf.int32))
+        end_positions = features.get("end_positions", tf.zeros([bsz], dtype=tf.int32))
+        is_impossible = features.get("is_impossible", tf.zeros([bsz], dtype=tf.int32))
 
         loss_rate = 1.
         embedded_inputs = None
@@ -1874,12 +1869,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
 
             with tf.control_dependencies([train_op]):
-                adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+                # adv_assign_op = tf.assign(adv_step, 1 - adv_step)
                 perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
 
+            # group_ops = tf.cond(tf.equal(adv_step, 0),
+            #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
+            #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
             group_ops = tf.cond(tf.equal(adv_step, 0),
-                                lambda: tf.group(perturb_assign_op, adv_assign_op),
-                                lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
+                                lambda: tf.group(perturb_assign_op),
+                                lambda: tf.group(train_op, perturb_assign_op))
 
             def save_loss():
                 loss = tf.assign(before_loss, total_loss)
