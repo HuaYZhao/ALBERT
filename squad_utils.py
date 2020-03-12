@@ -1875,7 +1875,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # group_ops = tf.cond(tf.equal(adv_step, 0),
             #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
             #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
-            group_ops = tf.cond(tf.equal(adv_step, 0),
+            group_ops = tf.cond(tf.equal(adv_step, 1),
                                 lambda: tf.group(perturb_assign_op),
                                 lambda: tf.group(train_op, perturb_assign_op))
 
