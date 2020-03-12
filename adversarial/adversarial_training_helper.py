@@ -1,17 +1,11 @@
 import tensorflow as tf
 
-from tensorflow.estimator import SessionRunHook
-
 
 class AdversarialTrainingHelper:
     """ 用于存储梯度 """
 
-    def __init__(self):
-        self.is_adv_step = False
-        self.grads_vars = None
-        self.perturb = None
-
-    def save_grads(self, loss):
+    @staticmethod
+    def save_grads(loss):
         tvars = tf.trainable_variables()
         grads = tf.gradients(loss, tvars)
         # This is how the model was pre-trained.
@@ -27,15 +21,17 @@ class AdversarialTrainingHelper:
         self.is_adv_step = not self.is_adv_step
         return grads_vars
 
+    @staticmethod
     # Adds gradient to embedding and recomputes classification loss.
-    def _scale_l2(self, x, norm_length):
+    def _scale_l2(x, norm_length):
         alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
         l2_norm = alpha * tf.sqrt(
             tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
         x_unit = x / l2_norm
         return norm_length * x_unit
 
-    def compute_embedding_perturb(self, loss, word_embedding):
+    @staticmethod
+    def compute_embedding_perturb(loss, word_embedding):
         if not self.is_adv_step:
             grad, = tf.gradients(
                 loss,
