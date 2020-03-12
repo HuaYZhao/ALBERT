@@ -1695,16 +1695,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
         def restore_inputs():
-            now_unique_ids = before_unique_ids
-            now_inputs_ids = before_input_ids
-            now_input_mask = before_input_mask
-            now_segment_ids = before_segment_ids
-            now_p_mask = before_p_mask
-            now_start_positions = before_start_positions
-            now_end_positions = before_end_positions
-            now_is_impossible = before_is_impossible
-            return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
-                    now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
+            with tf.control_dependencies([tf.assert_equal(input_ids, before_input_ids)]):
+                now_unique_ids = before_unique_ids
+                now_inputs_ids = before_input_ids
+                now_input_mask = before_input_mask
+                now_segment_ids = before_segment_ids
+                now_p_mask = before_p_mask
+                now_start_positions = before_start_positions
+                now_end_positions = before_end_positions
+                now_is_impossible = before_is_impossible
+                return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
+                        now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
         (unique_ids, input_ids, input_mask, segment_ids,
          p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
