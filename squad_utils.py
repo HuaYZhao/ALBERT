@@ -1695,7 +1695,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
         def restore_inputs():
-            with tf.control_dependencies([tf.assert_equal(input_ids, before_input_ids)]):
+            with tf.control_dependencies([tf.assert_none_equal(input_ids, before_input_ids)]):
                 now_unique_ids = before_unique_ids
                 now_inputs_ids = before_input_ids
                 now_input_mask = before_input_mask
