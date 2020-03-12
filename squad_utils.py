@@ -1892,7 +1892,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=merge_loss,
-                train_op=group_ops,
+                train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
