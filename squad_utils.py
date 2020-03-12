@@ -1613,7 +1613,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         for name in sorted(features.keys()):
             tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
 
-        # unique_ids = features["unique_ids"]
+        unique_ids = features["unique_ids"]
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
@@ -1650,6 +1650,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                           initializer=lambda: tf.constant(0, dtype=tf.float32),
                                           trainable=False,
                                           dtype=tf.float32)
+            before_unique_ids = tf.get_variable("before_unique_ids",
+                                                initializer=lambda: tf.zeros_like(unique_ids, dtype=unique_ids.dtype),
+                                                trainable=False,
+                                                dtype=unique_ids.dtype)
             before_input_ids = tf.get_variable("before_input_ids",
                                                initializer=lambda: tf.zeros_like(input_ids, dtype=input_ids.dtype),
                                                trainable=False,
@@ -1685,6 +1689,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                                    dtype=is_impossible.dtype)
 
         def backup_inputs():
+            now_unique_ids = tf.assign(before_unique_ids, unique_ids)
             now_inputs_ids = tf.assign(before_input_ids, input_ids)
             now_input_mask = tf.assign(before_input_mask, input_mask)
             now_segment_ids = tf.assign(before_segment_ids, segment_ids)
@@ -1692,10 +1697,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             now_start_positions = tf.assign(before_start_positions, start_positions)
             now_end_positions = tf.assign(before_end_positions, end_positions)
             now_is_impossible = tf.assign(before_is_impossible, is_impossible)
-            return (now_inputs_ids, now_input_mask, now_segment_ids,
+            return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
         def restore_inputs():
+            now_unique_ids = before_unique_ids
             now_inputs_ids = before_input_ids
             now_input_mask = before_input_mask
             now_segment_ids = before_segment_ids
@@ -1703,13 +1709,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             now_start_positions = before_start_positions
             now_end_positions = before_end_positions
             now_is_impossible = before_is_impossible
-            return (now_inputs_ids, now_input_mask, now_segment_ids,
+            return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
-        (input_ids, input_mask, segment_ids, p_mask, start_positions, end_positions, is_impossible) = tf.cond(
-            tf.equal(adv_step, 0), backup_inputs, restore_inputs)
+        (unique_ids, input_ids, input_mask, segment_ids,
+         p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
+                                                                          backup_inputs,
+                                                                          restore_inputs)
 
         features = dict()
+        features["unique_ids"] = unique_ids
         features["input_ids"] = input_ids
         features["input_mask"] = input_mask
         features["segment_ids"] = segment_ids
