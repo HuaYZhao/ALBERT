@@ -1600,6 +1600,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return return_dict
 
 
+step = 1
+
+
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1757,13 +1760,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def save_to_collection():
                 with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 0)]):
                     gvs = {v: g for g, v in zip(grads, tvars)}
-                    tf.add_to_collection("temp_gvs", gvs)
+                    tf.add_to_collection("temp_gvs", gvs)  # 永远只做一次
                     return gvs.values()
 
             def clear_collection():
-                with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 2)]):
+                global step
+                with tf.control_dependencies([tf.assert_equal(step, 1)]):
                     temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                     gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
+                    step += 1
                     # del temp_gvs
                     return gvs.values()
 
