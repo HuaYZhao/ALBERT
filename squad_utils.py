@@ -1695,7 +1695,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
         def restore_inputs():
-            tf.assert_equal(unique_ids, before_unique_ids)
             now_unique_ids = before_unique_ids
             now_inputs_ids = before_input_ids
             now_input_mask = before_input_mask
@@ -1707,20 +1706,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
-        (unique_ids, input_ids, input_mask, segment_ids,
-         p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
-                                                                          backup_inputs,
-                                                                          restore_inputs)
-
-        features = dict()
-        features["unique_ids"] = unique_ids
-        features["input_ids"] = input_ids
-        features["input_mask"] = input_mask
-        features["segment_ids"] = segment_ids
-        features["p_mask"] = p_mask
-        features["start_positions"] = start_positions
-        features["end_positions"] = end_positions
-        features["is_impossible"] = is_impossible
+        # (unique_ids, input_ids, input_mask, segment_ids,
+        #  p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
+        #                                                                   backup_inputs,
+        #                                                                   restore_inputs)
+        #
+        # features = dict()
+        # features["unique_ids"] = unique_ids
+        # features["input_ids"] = input_ids
+        # features["input_mask"] = input_mask
+        # features["segment_ids"] = segment_ids
+        # features["p_mask"] = p_mask
+        # features["start_positions"] = start_positions
+        # features["end_positions"] = end_positions
+        # features["is_impossible"] = is_impossible
 
         if is_training:
             embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
@@ -1865,20 +1864,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
-            # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
-            #                    lambda: optimization.create_optimizer(
-            #                        list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
-            train_op = tf.cond(tf.equal(adv_step, 1), lambda: tf.no_op(),
+            train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
                                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
 
-            # with tf.control_dependencies([train_op]):
-            #     adv_assign_op = tf.assign(adv_step, 1 - adv_step)
-            #     perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+            with tf.control_dependencies([train_op]):
+                adv_assign_op = tf.assign(adv_step, 1 - adv_step)
+                perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
 
-            # group_ops = tf.cond(tf.equal(adv_step, 0),
-            #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
-            #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
+            group_ops = tf.cond(tf.equal(adv_step, 0),
+                                lambda: tf.group(perturb_assign_op, adv_assign_op),
+                                lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
 
             def save_loss():
                 loss = tf.assign(before_loss, total_loss)
@@ -1894,7 +1890,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=merge_loss,
-                train_op=train_op,
+                train_op=group_ops,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
