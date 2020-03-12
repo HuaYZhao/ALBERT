@@ -1706,20 +1706,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
                     now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
 
-        (unique_ids, input_ids, input_mask, segment_ids,
-         p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
-                                                                          backup_inputs,
-                                                                          restore_inputs)
-
-        features = dict()
-        features["unique_ids"] = unique_ids
-        features["input_ids"] = input_ids
-        features["input_mask"] = input_mask
-        features["segment_ids"] = segment_ids
-        features["p_mask"] = p_mask
-        features["start_positions"] = start_positions
-        features["end_positions"] = end_positions
-        features["is_impossible"] = is_impossible
+        # (unique_ids, input_ids, input_mask, segment_ids,
+        #  p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
+        #                                                                   backup_inputs,
+        #                                                                   restore_inputs)
+        #
+        # features = dict()
+        # features["unique_ids"] = unique_ids
+        # features["input_ids"] = input_ids
+        # features["input_mask"] = input_mask
+        # features["segment_ids"] = segment_ids
+        # features["p_mask"] = p_mask
+        # features["start_positions"] = start_positions
+        # features["end_positions"] = end_positions
+        # features["is_impossible"] = is_impossible
 
         if is_training:
             embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
