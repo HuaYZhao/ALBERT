@@ -1622,9 +1622,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         loss_rate = 1.
         embedded_inputs = None
 
-        with tf.Session() as sess:
-            sess.run(input_ids)
-
         with tf.variable_scope("perturb_embedding", reuse=tf.AUTO_REUSE):
             perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
                                                        initializer=lambda: tf.zeros(
@@ -1764,7 +1761,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     return gvs.values()
 
             def clear_collection():
-                with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 1)]):
+                with tf.control_dependencies([tf.assert_equal(len(tf.get_collection("temp_gvs")), 2)]):
                     temp_gvs = tf.get_collection_ref("temp_gvs")[0]
                     gvs = {v: g + temp_gvs[v] for g, v in zip(grads, tvars)}
                     # del temp_gvs
