@@ -1751,25 +1751,21 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grads_adv = tf.gradients(0.125 * adv_loss, tvars)
             # (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
 
-            grads = grads_norm + grads_adv
+            grads = [g1 + g2 for g1, g2 in zip(grads_norm, grads_adv)]
+            print("len", len(grads), len(grads_norm + grads_adv))
 
-            grads_true = tf.gradients(total_loss, tvars)
-            _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
+            # grads_true = tf.gradients(total_loss, tvars)
+            # _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
             (final_grads, global_norm2) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-            diff = global_norm2 - global_norm1
-
-            # train_op = optimization.create_optimizer(
-            #     list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-            save_grads = {"grads_norm": grads_norm,
-                          "grads_adv": grads_adv,
-                          "grads_true": grads_true}
-            from adversarial.hook import GlaceHook
-
-            glace = GlaceHook(save_grads)
-
-            train_op = tf.cond(tf.not_equal(diff, 0.), lambda: tf.no_op(), lambda: optimization.create_optimizer(
-                list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
+            train_op = optimization.create_optimizer(
+                list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            # save_grads = {"grads_norm": grads_norm,
+            #               "grads_adv": grads_adv,
+            #               "grads_true": grads_true}
+            # from adversarial.hook import GlaceHook
+            #
+            # glace = GlaceHook(save_grads)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
@@ -1777,7 +1773,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss=total_loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn,
-                training_hooks=[glace])
+                # training_hooks=[glace]
+            )
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
