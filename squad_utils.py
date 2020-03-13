@@ -1886,11 +1886,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
+            from adversarial.hook import GlaceHook
+
+            glace = {"features": features,
+                     "adv_step": adv_step,
+                     "merge_loss": merge_loss,
+                     "before_loss": before_loss,
+                     "grads": grads,
+                     "before_grads": before_grads}
+            glace_hook = GlaceHook([tf.train.get_or_create_global_step(), glace])
+
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=merge_loss,
                 train_op=group_ops,
-                scaffold_fn=scaffold_fn)
+                scaffold_fn=scaffold_fn,
+                training_hooks=[glace_hook])
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],

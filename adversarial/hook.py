@@ -15,4 +15,5 @@ class GlaceHook(SessionRunHook):
     def after_run(self,
                   run_context,  # pylint: disable=unused-argument
                   run_values):
-        np.savez("save.npz", **run_values.results)
+        step = run_values.results[0]
+        np.savez(f"save_{step}.npz", **run_values.results[1])
