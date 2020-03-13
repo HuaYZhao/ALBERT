@@ -707,7 +707,7 @@ def input_fn_builder(input_file, seq_length, is_training,
 
         rd = tf.data.experimental.choose_from_datasets(ds, choice_dataset)
 
-        return d
+        return rd
 
     return input_fn
 
@@ -1863,7 +1863,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 return new_grads
 
             grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
-            print("grads_len", len(grads))
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
@@ -1887,7 +1886,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
-            print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=merge_loss,
