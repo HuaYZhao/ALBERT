@@ -1895,7 +1895,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 # "merge_loss": merge_loss,
                 # "before_loss": before_loss,
                 "grads": grads,
-                "before_grads": before_grads.values()
+                "before_grads": list(before_grads.values())
             }
             glace_hook = GlaceHook(glace)
 
