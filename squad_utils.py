@@ -1762,7 +1762,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # train_op = optimization.create_optimizer(
             #     list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-            train_op = tf.cond(tf.equal(diff, 0.), lambda: tf.no_op(), lambda: optimization.create_optimizer(
+            train_op = tf.cond(tf.not_equal(diff, 0.), lambda: tf.no_op(), lambda: optimization.create_optimizer(
                 list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
 
             print("all ops", tf.get_default_graph().get_operations())
