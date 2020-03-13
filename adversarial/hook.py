@@ -20,5 +20,6 @@ class GlaceHook(SessionRunHook):
                   run_values):
         # np.savez(f"save_{run_values.results['global_step']}.npz", **run_values.results)
         global i
-        i += 1
         dill.dump(run_values.results, open(f"save_{i}.pkl", 'wb'))
+        i += 1
+
