@@ -4,6 +4,8 @@ from tensorflow.estimator import SessionRunHook
 import numpy as np
 import dill
 
+i = 0
+
 
 class GlaceHook(SessionRunHook):
 
@@ -17,4 +19,6 @@ class GlaceHook(SessionRunHook):
                   run_context,  # pylint: disable=unused-argument
                   run_values):
         # np.savez(f"save_{run_values.results['global_step']}.npz", **run_values.results)
-        dill.dump(run_values.results, open(f"save_{run_values.results['global_step']}.pkl", 'wb'))
+        global i
+        i += 1
+        dill.dump(run_values.results, open(f"save_{i}.pkl", 'wb'))
