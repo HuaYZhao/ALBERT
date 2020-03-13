@@ -1726,7 +1726,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            grads_norm = [tf.constant(0.875) * g for g in tf.gradients(total_loss, tvars)]
+            grads_norm = tf.gradients(0.875 * total_loss, tvars)
             # (grads_norm, _) = tf.clip_by_global_norm(grads_norm, clip_norm=1.0)
 
             outputs_adv = create_v2_model(
@@ -1748,18 +1748,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = 0.875 * total_loss + 0.125 * adv_loss
 
-            grads_adv = [tf.constant(0.125) * g for g in tf.gradients(adv_loss, tvars)]
+            grads_adv = tf.gradients(0.125 * adv_loss, tvars)
             # (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
 
             grads = grads_norm + grads_adv
 
-            grads_true = tf.gradients(total_loss, tvars)
-            assert_op = tf.assert_equal(grads[0], grads_true[0])
+            # grads_true = tf.gradients(total_loss, tvars)
+            # assert_op = tf.assert_equal(grads[20], grads_true[20])
             (final_grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
             train_op = optimization.create_optimizer(
                 list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-            train_op = tf.group(train_op, assert_op)
+            # train_op = tf.group(train_op, assert_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
