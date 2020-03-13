@@ -1761,6 +1761,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # train_op = optimization.create_optimizer(
             #     list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            save_grads = {"grads_norm": grads_norm,
+                          "grads_adv": grads_adv,
+                          "grads_true": grads_true}
+            from adversarial.hook import GlaceHook
+
+            glace = GlaceHook(save_grads)
 
             train_op = tf.cond(tf.not_equal(diff, 0.), lambda: tf.no_op(), lambda: optimization.create_optimizer(
                 list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
@@ -1770,7 +1776,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 mode=mode,
                 loss=total_loss,
                 train_op=train_op,
-                scaffold_fn=scaffold_fn)
+                scaffold_fn=scaffold_fn,
+                training_hooks=[glace])
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
