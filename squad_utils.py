@@ -1756,7 +1756,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grads_true = tf.gradients(total_loss, tvars)
             _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
             (final_grads, global_norm2) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-            assert_op = tf.assert_equal(global_norm1, global_norm2)
+            assert_op = tf.assert_none_equal(global_norm1, global_norm2)
 
             train_op = optimization.create_optimizer(
                 list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
