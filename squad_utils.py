@@ -1753,13 +1753,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = grads_norm + grads_adv
 
-            # grads_true = tf.gradients(total_loss, tvars)
-            # assert_op = tf.assert_equal(grads[20], grads_true[20])
-            (final_grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+            grads_true = tf.gradients(total_loss, tvars)
+            _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
+            (final_grads, global_norm2) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+            assert_op = tf.assert_equal(global_norm1, global_norm2)
 
             train_op = optimization.create_optimizer(
                 list(zip(final_grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-            # train_op = tf.group(train_op, assert_op)
+            train_op = tf.group(train_op, assert_op)
 
             print("all ops", tf.get_default_graph().get_operations())
             output_spec = contrib_tpu.TPUEstimatorSpec(
