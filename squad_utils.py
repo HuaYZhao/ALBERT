@@ -1852,9 +1852,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def sum_grads():
                 return [tf.assign_add(before_grads[i], gs[i]) for i in range(len(tvars))]
 
-            grads = tf.cond(tf.equal(adv_step, 0),
-                            lambda: save_grads,
-                            lambda: sum_grads)
+            grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
@@ -1874,9 +1872,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def sum_loss():
                 return tf.assign_add(before_loss, total_loss)
 
-            merge_loss = tf.cond(tf.equal(adv_step, 0),
-                                 lambda: save_loss,
-                                 lambda: sum_loss)
+            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
             from adversarial.hook import GlaceHook
 
