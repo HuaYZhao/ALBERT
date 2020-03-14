@@ -1630,86 +1630,86 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         loss_rate = 1.
         embedded_inputs = None
 
-        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
-            perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
-                                                       initializer=lambda: tf.zeros(
-                                                           shape=[bsz, max_seq_length, embedding_size],
-                                                           dtype=tf.float32),
-                                                       trainable=False,
-                                                       dtype=tf.float32)
-            adv_step = tf.get_variable("adv_step",
-                                       initializer=lambda: tf.constant(0, dtype=tf.int32),
-                                       trainable=False,
-                                       dtype=tf.int32)
-            before_loss = tf.get_variable("before_loss",
-                                          initializer=lambda: tf.constant(0, dtype=tf.float32),
-                                          trainable=False,
-                                          dtype=tf.float32)
-            before_unique_ids = tf.get_variable("before_unique_ids",
-                                                initializer=lambda: tf.zeros_like(unique_ids, dtype=unique_ids.dtype),
-                                                trainable=False,
-                                                dtype=unique_ids.dtype)
-            before_input_ids = tf.get_variable("before_input_ids",
-                                               initializer=lambda: tf.zeros_like(input_ids, dtype=input_ids.dtype),
-                                               trainable=False,
-                                               dtype=input_ids.dtype)
-            before_input_mask = tf.get_variable("before_input_mask",
-                                                initializer=lambda: tf.zeros_like(input_mask, dtype=input_mask.dtype),
-                                                trainable=False,
-                                                dtype=input_mask.dtype)
-            before_segment_ids = tf.get_variable("before_segment_ids",
-                                                 initializer=lambda: tf.zeros_like(segment_ids,
-                                                                                   dtype=segment_ids.dtype),
-                                                 trainable=False,
-                                                 dtype=segment_ids.dtype)
-            before_p_mask = tf.get_variable("before_p_mask",
-                                            initializer=lambda: tf.zeros_like(p_mask, dtype=p_mask.dtype),
-                                            trainable=False,
-                                            dtype=p_mask.dtype)
-            before_start_positions = tf.get_variable("before_start_positions",
-                                                     initializer=lambda: tf.zeros_like(start_positions,
-                                                                                       dtype=start_positions.dtype),
-                                                     trainable=False,
-                                                     dtype=start_positions.dtype)
-            before_end_positions = tf.get_variable("before_end_positions",
-                                                   initializer=lambda: tf.zeros_like(end_positions,
-                                                                                     dtype=end_positions.dtype),
-                                                   trainable=False,
-                                                   dtype=end_positions.dtype)
-            before_is_impossible = tf.get_variable("before_is_impossible",
-                                                   initializer=lambda: tf.zeros_like(is_impossible,
-                                                                                     dtype=is_impossible.dtype),
-                                                   trainable=False,
-                                                   dtype=is_impossible.dtype)
-
-        def backup_inputs():
-            now_unique_ids = tf.assign(before_unique_ids, unique_ids)
-            now_inputs_ids = tf.assign(before_input_ids, input_ids)
-            now_input_mask = tf.assign(before_input_mask, input_mask)
-            now_segment_ids = tf.assign(before_segment_ids, segment_ids)
-            now_p_mask = tf.assign(before_p_mask, p_mask)
-            now_start_positions = tf.assign(before_start_positions, start_positions)
-            now_end_positions = tf.assign(before_end_positions, end_positions)
-            now_is_impossible = tf.assign(before_is_impossible, is_impossible)
-            return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
-                    now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
-
-        def restore_inputs():
-            now_unique_ids = before_unique_ids
-            now_inputs_ids = before_input_ids
-            now_input_mask = before_input_mask
-            now_segment_ids = before_segment_ids
-            now_p_mask = before_p_mask
-            now_start_positions = before_start_positions
-            now_end_positions = before_end_positions
-            now_is_impossible = before_is_impossible
-            return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
-                    now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
-
-        (unique_ids, input_ids, input_mask, segment_ids,
-         p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
-                                                                          backup_inputs,
-                                                                          restore_inputs)
+        # with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
+        #     perturb_embedding_inputs = tf.get_variable("perturb_embedding_inputs",
+        #                                                initializer=lambda: tf.zeros(
+        #                                                    shape=[bsz, max_seq_length, embedding_size],
+        #                                                    dtype=tf.float32),
+        #                                                trainable=False,
+        #                                                dtype=tf.float32)
+        #     adv_step = tf.get_variable("adv_step",
+        #                                initializer=lambda: tf.constant(0, dtype=tf.int32),
+        #                                trainable=False,
+        #                                dtype=tf.int32)
+        #     before_loss = tf.get_variable("before_loss",
+        #                                   initializer=lambda: tf.constant(0, dtype=tf.float32),
+        #                                   trainable=False,
+        #                                   dtype=tf.float32)
+        #     before_unique_ids = tf.get_variable("before_unique_ids",
+        #                                         initializer=lambda: tf.zeros_like(unique_ids, dtype=unique_ids.dtype),
+        #                                         trainable=False,
+        #                                         dtype=unique_ids.dtype)
+        #     before_input_ids = tf.get_variable("before_input_ids",
+        #                                        initializer=lambda: tf.zeros_like(input_ids, dtype=input_ids.dtype),
+        #                                        trainable=False,
+        #                                        dtype=input_ids.dtype)
+        #     before_input_mask = tf.get_variable("before_input_mask",
+        #                                         initializer=lambda: tf.zeros_like(input_mask, dtype=input_mask.dtype),
+        #                                         trainable=False,
+        #                                         dtype=input_mask.dtype)
+        #     before_segment_ids = tf.get_variable("before_segment_ids",
+        #                                          initializer=lambda: tf.zeros_like(segment_ids,
+        #                                                                            dtype=segment_ids.dtype),
+        #                                          trainable=False,
+        #                                          dtype=segment_ids.dtype)
+        #     before_p_mask = tf.get_variable("before_p_mask",
+        #                                     initializer=lambda: tf.zeros_like(p_mask, dtype=p_mask.dtype),
+        #                                     trainable=False,
+        #                                     dtype=p_mask.dtype)
+        #     before_start_positions = tf.get_variable("before_start_positions",
+        #                                              initializer=lambda: tf.zeros_like(start_positions,
+        #                                                                                dtype=start_positions.dtype),
+        #                                              trainable=False,
+        #                                              dtype=start_positions.dtype)
+        #     before_end_positions = tf.get_variable("before_end_positions",
+        #                                            initializer=lambda: tf.zeros_like(end_positions,
+        #                                                                              dtype=end_positions.dtype),
+        #                                            trainable=False,
+        #                                            dtype=end_positions.dtype)
+        #     before_is_impossible = tf.get_variable("before_is_impossible",
+        #                                            initializer=lambda: tf.zeros_like(is_impossible,
+        #                                                                              dtype=is_impossible.dtype),
+        #                                            trainable=False,
+        #                                            dtype=is_impossible.dtype)
+        #
+        # def backup_inputs():
+        #     now_unique_ids = tf.assign(before_unique_ids, unique_ids)
+        #     now_inputs_ids = tf.assign(before_input_ids, input_ids)
+        #     now_input_mask = tf.assign(before_input_mask, input_mask)
+        #     now_segment_ids = tf.assign(before_segment_ids, segment_ids)
+        #     now_p_mask = tf.assign(before_p_mask, p_mask)
+        #     now_start_positions = tf.assign(before_start_positions, start_positions)
+        #     now_end_positions = tf.assign(before_end_positions, end_positions)
+        #     now_is_impossible = tf.assign(before_is_impossible, is_impossible)
+        #     return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
+        #             now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
+        #
+        # def restore_inputs():
+        #     now_unique_ids = before_unique_ids
+        #     now_inputs_ids = before_input_ids
+        #     now_input_mask = before_input_mask
+        #     now_segment_ids = before_segment_ids
+        #     now_p_mask = before_p_mask
+        #     now_start_positions = before_start_positions
+        #     now_end_positions = before_end_positions
+        #     now_is_impossible = before_is_impossible
+        #     return (now_unique_ids, now_inputs_ids, now_input_mask, now_segment_ids,
+        #             now_p_mask, now_start_positions, now_end_positions, now_is_impossible)
+        #
+        # (unique_ids, input_ids, input_mask, segment_ids,
+        #  p_mask, start_positions, end_positions, is_impossible) = tf.cond(tf.equal(adv_step, 0),
+        #                                                                   backup_inputs,
+        #                                                                   restore_inputs)
 
         features = dict()
         features["unique_ids"] = unique_ids
@@ -1891,15 +1891,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             group_ops = optimization.create_optimizer(
                 list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-            def save_loss():
-                loss = tf.assign(before_loss, total_loss)
-                return loss
-
-            def sum_loss():
-                loss = total_loss + before_loss
-                return loss
-
-            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
+            # def save_loss():
+            #     loss = tf.assign(before_loss, total_loss)
+            #     return loss
+            #
+            # def sum_loss():
+            #     loss = total_loss + before_loss
+            #     return loss
+            #
+            # merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
             from adversarial.hook import GlaceHook
 
@@ -1916,7 +1916,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=merge_loss,
+                loss=total_loss,
                 train_op=group_ops,
                 scaffold_fn=scaffold_fn,
                 # training_hooks=[glace_hook]
