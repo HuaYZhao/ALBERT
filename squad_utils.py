@@ -1843,26 +1843,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = tf.gradients(total_loss, tvars)
 
-            # def save_grads():
-            #     new_grads = []
-            #     gvs = {v: g for g, v in zip(grads, tvars)}
-            #     for v in tvars:
-            #         b_g = before_grads[v]
-            #         new_grad = tf.assign(b_g, gvs[v])
-            #         new_grads.append(new_grad)
-            #     return new_grads
-            #
-            # def sum_grads():
-            #     new_grads = []
-            #     gvs = {v: g for g, v in zip(grads, tvars)}
-            #     for v in tvars:
-            #         b_g = before_grads[v]
-            #         new_grad = gvs[v] + b_g
-            #         new_grads.append(new_grad)
-            #     (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
-            #     return new_grads
+            def save_grads():
+                nonlocal grads
+                for i, v in enumerate(tvars):
+                    grads[i] = tf.assign(before_grads[v], grads[i])
+                return grads
 
-            # grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
+            def sum_grads():
+                nonlocal grads
+                for i, v in enumerate(tvars):
+                    grads[i] += before_grads[v]
+                (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+                return grads
+
+            grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
             # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
             #                    lambda: optimization.create_optimizer(
