@@ -1846,11 +1846,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             def save_grads():
                 gs = tf.gradients(total_loss, tvars)
-                return [tf.assign(before_grads[v], gs[i]) for i, v in enumerate(tvars)]
+                return [tf.assign(before_grads[i], gs[i]) for i in range(len(tvars))]
 
             def save_sum_grads():
                 gs = tf.gradients(total_loss, tvars)
-                return [tf.assign_add(before_grads[v], gs[i]) for i, v in enumerate(tvars)]
+                return [tf.assign_add(before_grads[i], gs[i]) for i in range(len(tvars))]
 
             def update_backup_grads():
                 return before_grads
