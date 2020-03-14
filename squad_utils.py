@@ -1721,10 +1721,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         # features["end_positions"] = end_positions
         # features["is_impossible"] = is_impossible
 
-        # if is_training:
-        #     embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
-        #                               lambda: tf.zeros_like(perturb_embedding_inputs))
-        #     loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
+        if is_training:
+            embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
+                                      lambda: tf.zeros_like(perturb_embedding_inputs))
+            loss_rate = tf.cond(tf.equal(adv_step, 1), lambda: 0.125, lambda: 0.875)
 
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1743,12 +1743,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         tvars = tf.trainable_variables()
 
-        # with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
-        #     before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
-        #                                        initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
-        #                                        trainable=False,
-        #                                        dtype=tf.float32)
-        #                     for i, v in enumerate(tvars)}
+        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
+            before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
+                                               initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
+                                               trainable=False,
+                                               dtype=tf.float32)
+                            for i, v in enumerate(tvars)}
 
         initialized_variable_names = {}
         scaffold_fn = None
