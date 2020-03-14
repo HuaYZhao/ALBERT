@@ -1749,7 +1749,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                             trainable=False,
                                             dtype=tf.float32)
                             for i, v in enumerate(tvars)]
-            print("before_grads_len", len(before_grads))
 
         initialized_variable_names = {}
         scaffold_fn = None
@@ -1842,10 +1841,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            grads = tf.gradients(total_loss, tvars)
-            print("grads_len", len(grads))
-            # grads2 = tf.gradients(total_loss, tvars)
-            # grads = [g1 + g2 for g1, g2 in zip(grads1, grads2)]
+            grads1 = tf.gradients(total_loss, tvars)
+            grads2 = tf.gradients(0.5*(total_loss - 1), tvars)
+            grads = [g1 + g2 for g1, g2 in zip(grads1, grads2)]
 
             # def save_grads():
             #     # nonlocal grads
@@ -1868,7 +1866,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #
             # grads = new_grads
 
-            grads = [g + before_grads[i] for i, g in enumerate(grads)]
+            # grads = [g + before_grads[i] for i, g in enumerate(grads)]
 
             # def save_grads():
             #     new_grads = []
