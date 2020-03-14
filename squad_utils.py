@@ -1772,7 +1772,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
                 # train_op = optimization.create_optimizer(
                 #     list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-                train_op = tf.train.GradientDescentOptimizer(learning_rate).minimize(total_loss)
+                optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
+                train_op = optimizer.apply_gradients(
+                    list(zip(grads, tvars)), global_step=tf.train.get_or_create_global_step())
                 # save_grads = {"grads_norm": grads_norm,
                 #               "grads_adv": grads_adv,
                 #               "grads_true": grads_true}
