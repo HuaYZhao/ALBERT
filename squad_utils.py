@@ -1904,7 +1904,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss=merge_loss,
                 train_op=group_ops,
                 scaffold_fn=scaffold_fn,
-                # training_hooks=[glace_hook]
+                training_hooks=[glace_hook]
             )
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
