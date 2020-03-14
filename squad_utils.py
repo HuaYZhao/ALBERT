@@ -1448,7 +1448,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
+    (_, output, _, _) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
