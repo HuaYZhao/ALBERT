@@ -1841,7 +1841,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            grads = tf.gradients(total_loss, tvars)
+            grads1 = tf.gradients(total_loss, tvars)
+            grads2 = tf.gradients(total_loss, tvars)
+            grads = [g1 + g2 for g1, g2 in zip(grads1, grads2)]
 
             # def save_grads():
             #     # nonlocal grads
@@ -1859,21 +1861,21 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
             #     return grads
 
-            def save_grads():
-                new_grads = []
-                for i, v in enumerate(tvars):
-                    new_grads.append(tf.assign(before_grads[v], grads[i]))
-                return new_grads
-
-            def sum_grads():
-                # new_grads = []
-                # for i, v in enumerate(tvars):
-                #     new_grad = grads[i] + before_grads[v]
-                #     new_grads.append(new_grad)
-                # (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
-                return grads
-
-            grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
+            # def save_grads():
+            #     new_grads = []
+            #     for i, v in enumerate(tvars):
+            #         new_grads.append(tf.assign(before_grads[v], grads[i]))
+            #     return new_grads
+            #
+            # def sum_grads():
+            #     # new_grads = []
+            #     # for i, v in enumerate(tvars):
+            #     #     new_grad = grads[i] + before_grads[v]
+            #     #     new_grads.append(new_grad)
+            #     # (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
+            #     return grads
+            #
+            # grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
             # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
             #                    lambda: optimization.create_optimizer(
