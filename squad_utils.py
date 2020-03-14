@@ -33,7 +33,7 @@ import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
@@ -1770,8 +1770,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 # _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
                 (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-                train_op = optimization.create_optimizer(
-                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                # train_op = optimization.create_optimizer(
+                #     list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                trian_op = tf.train.GradientDescentOptimizer(learning_rate).minimize(total_loss)
                 # save_grads = {"grads_norm": grads_norm,
                 #               "grads_adv": grads_adv,
                 #               "grads_true": grads_true}
