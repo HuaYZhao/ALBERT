@@ -45,7 +45,7 @@ def _create_model_from_hub(hub_module, is_training, input_ids, input_mask,
 
 def _create_model_from_scratch(albert_config, is_training, input_ids,
                                input_mask, segment_ids, use_one_hot_embeddings,
-                               use_einsum, embedded_inputs):
+                               use_einsum, embedded_inputs=None):
     """Creates an ALBERT model from scratch/config."""
     model = modeling.AlbertModel(
         config=albert_config,
