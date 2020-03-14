@@ -1711,15 +1711,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         #                                                                   backup_inputs,
         #                                                                   restore_inputs)
 
-        features = dict()
-        features["unique_ids"] = unique_ids
-        features["input_ids"] = input_ids
-        features["input_mask"] = input_mask
-        features["segment_ids"] = segment_ids
-        features["p_mask"] = p_mask
-        features["start_positions"] = start_positions
-        features["end_positions"] = end_positions
-        features["is_impossible"] = is_impossible
+        # features = dict()
+        # features["unique_ids"] = unique_ids
+        # features["input_ids"] = input_ids
+        # features["input_mask"] = input_mask
+        # features["segment_ids"] = segment_ids
+        # features["p_mask"] = p_mask
+        # features["start_positions"] = start_positions
+        # features["end_positions"] = end_positions
+        # features["is_impossible"] = is_impossible
 
         # if is_training:
         #     embedded_inputs = tf.cond(tf.equal(adv_step, 1), lambda: perturb_embedding_inputs,
