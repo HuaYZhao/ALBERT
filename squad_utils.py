@@ -1860,11 +1860,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     #     grads[i] = g
             #     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
             #     return grads
-            new_grads = []
-            for i in range(len(tvars)):
-                new_grads.append(tf.assign(before_grads[i], grads[i]))
+            # new_grads = []
+            # for i in range(len(tvars)):
+            #     new_grads.append(grads[i] + before_grads[i])
+            #
+            # grads = new_grads
 
-            grads = new_grads
+            grads = [g + before_grads[i] for i, g in enumerate(grads)]
+
             # def save_grads():
             #     new_grads = []
             #     for i, v in enumerate(tvars):
