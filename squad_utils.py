@@ -1743,12 +1743,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         tvars = tf.trainable_variables()
 
-        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
-            before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
-                                               initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
-                                               trainable=False,
-                                               dtype=tf.float32)
-                            for i, v in enumerate(tvars)}
+        # with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
+        #     before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
+        #                                        initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
+        #                                        trainable=False,
+        #                                        dtype=tf.float32)
+        #                     for i, v in enumerate(tvars)}
 
         initialized_variable_names = {}
         scaffold_fn = None
@@ -1843,26 +1843,26 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             grads = tf.gradients(total_loss, tvars)
 
-            def save_grads():
-                new_grads = []
-                gvs = {v: g for g, v in zip(grads, tvars)}
-                for v in tvars:
-                    b_g = before_grads[v]
-                    new_grad = tf.assign(b_g, gvs[v])
-                    new_grads.append(new_grad)
-                return new_grads
+            # def save_grads():
+            #     new_grads = []
+            #     gvs = {v: g for g, v in zip(grads, tvars)}
+            #     for v in tvars:
+            #         b_g = before_grads[v]
+            #         new_grad = tf.assign(b_g, gvs[v])
+            #         new_grads.append(new_grad)
+            #     return new_grads
+            #
+            # def sum_grads():
+            #     new_grads = []
+            #     gvs = {v: g for g, v in zip(grads, tvars)}
+            #     for v in tvars:
+            #         b_g = before_grads[v]
+            #         new_grad = gvs[v] + b_g
+            #         new_grads.append(new_grad)
+            #     (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
+            #     return new_grads
 
-            def sum_grads():
-                new_grads = []
-                gvs = {v: g for g, v in zip(grads, tvars)}
-                for v in tvars:
-                    b_g = before_grads[v]
-                    new_grad = gvs[v] + b_g
-                    new_grads.append(new_grad)
-                (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
-                return new_grads
-
-            grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
+            # grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
 
             # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
             #                    lambda: optimization.create_optimizer(
