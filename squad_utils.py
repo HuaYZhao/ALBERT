@@ -1841,9 +1841,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grad = tf.stop_gradient(grad)
             perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            grads1 = tf.gradients(total_loss, tvars)
-            grads2 = tf.gradients(0.5*(total_loss - 1), tvars)
-            grads = [g1 + g2 for g1, g2 in zip(grads1, grads2)]
+            grads = tf.gradients(total_loss, tvars)
+            grads = before_grads
 
             # def save_grads():
             #     # nonlocal grads
