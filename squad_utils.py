@@ -1860,11 +1860,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     return grads
 
             def save_grads():
-                new_grads = []
-                for i, v in enumerate(tvars):
-                    new_grad = tf.assign(before_grads[v], grads[i])
-                    new_grads.append(new_grad)
-                return new_grads
+                # new_grads = []
+                # for i, v in enumerate(tvars):
+                #     new_grad = tf.assign(before_grads[v], grads[i])
+                #     new_grads.append(new_grad)
+                return grads
 
             def sum_grads():
                 # new_grads = []
