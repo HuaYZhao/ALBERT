@@ -1855,9 +1855,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def update_backup_grads():
                 return before_grads
 
-            grads = tf.case((tf.equal(adv_step, 0), save_grads),
-                            (tf.equal(adv_step, 1), save_sum_grads),
-                            (tf.equal(adv_step, 2), update_backup_grads))
+            grads = tf.case([(tf.equal(adv_step, 0), save_grads),
+                             (tf.equal(adv_step, 1), save_sum_grads),
+                             (tf.equal(adv_step, 2), update_backup_grads)])
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
                                lambda: optimization.create_optimizer(
@@ -1881,9 +1881,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def restore_backup_loss():
                 return before_loss
 
-            merge_loss = tf.case((tf.equal(adv_step, 0), save_loss),
-                                 (tf.equal(adv_step, 1), save_sum_loss),
-                                 (tf.equal(adv_step, 2), restore_backup_loss))
+            merge_loss = tf.case([(tf.equal(adv_step, 0), save_loss),
+                                  (tf.equal(adv_step, 1), save_sum_loss),
+                                  (tf.equal(adv_step, 2), restore_backup_loss)])
 
             from adversarial.hook import GlaceHook
 
