@@ -1846,13 +1846,15 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def save_grads():
                 nonlocal grads
                 for i, v in enumerate(tvars):
-                    grads[i] = tf.assign(before_grads[v], grads[i])
+                    g = tf.assign(before_grads[v], grads[i])
+                    grads[i] = g
                 return grads
 
             def sum_grads():
                 nonlocal grads
                 for i, v in enumerate(tvars):
-                    grads[i] = before_grads[v] + grads[i]
+                    g = before_grads[v] + grads[i]
+                    grads[i] = g
                 (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
                 return grads
 
