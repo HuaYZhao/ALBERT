@@ -1890,16 +1890,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             from adversarial.hook import GlaceHook
 
-            glace = {
-                "global_step": tf.train.get_or_create_global_step(),
-                "features": features,
-                "adv_step": adv_step,
-                "merge_loss": merge_loss,
-                "before_loss": before_loss,
-                "grads": grads,
-                "before_grads": list(before_grads.values())
-            }
-            glace_hook = GlaceHook(glace)
+            # glace = {
+            #     "global_step": tf.train.get_or_create_global_step(),
+            #     "features": features,
+            #     "adv_step": adv_step,
+            #     "merge_loss": merge_loss,
+            #     "before_loss": before_loss,
+            #     "grads": grads,
+            #     "before_grads": list(before_grads.values())
+            # }
+            # glace_hook = GlaceHook(glace)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
