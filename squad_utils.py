@@ -1845,16 +1845,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             perturb = tf.cond(tf.equal(adv_step, 0), compute_perturb, lambda: tf.zeros_like(perturb_embedding_inputs))
 
             def save_grads():
-                return [tf.assign(before_grads[v], grads[i]) for i, v in enumerate(tvars)]
+                gs = tf.gradients(total_loss, tvars)
+                return [tf.assign(before_grads[v], gs[i]) for i, v in enumerate(tvars)]
 
-            def update_grads():
-                return tf.gradients(total_loss, tvars)
+            def save_sum_grads():
+                gs = tf.gradients(total_loss, tvars)
+                return [tf.assign_add(before_grads[v], gs[i]) for i, v in enumerate(tvars)]
 
             def update_backup_grads():
                 return before_grads
 
             grads = tf.case((tf.equal(adv_step, 0), save_grads),
-                            (tf.equal(adv_step, 1), update_grads),
+                            (tf.equal(adv_step, 1), save_sum_grads),
                             (tf.equal(adv_step, 2), update_backup_grads))
 
             train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
@@ -1868,17 +1870,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # group_ops = tf.cond(tf.equal(adv_step, 0),
             #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
             #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
-            group_ops = tf.group(train_op,perturb_assign_op,adv_assign_op)
+            group_ops = tf.group(train_op, perturb_assign_op, adv_assign_op)
 
             def save_loss():
-                loss = tf.assign(before_loss, total_loss)
-                return loss
+                return tf.assign(before_loss, total_loss)
 
-            def sum_loss():
-                loss = total_loss + before_loss
-                return loss
+            def save_sum_loss():
+                return tf.assign_add(before_loss, total_loss)
 
-            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
+            def restore_backup_loss():
+                return before_loss
+
+            merge_loss = tf.case((tf.equal(adv_step, 0), save_loss),
+                                 (tf.equal(adv_step, 1), save_sum_loss),
+                                 (tf.equal(adv_step, 2), restore_backup_loss))
 
             from adversarial.hook import GlaceHook
 
@@ -1895,7 +1900,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=total_loss,
+                loss=merge_loss,
                 train_op=group_ops,
                 scaffold_fn=scaffold_fn,
                 # training_hooks=[glace_hook]
