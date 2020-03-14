@@ -1744,11 +1744,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         tvars = tf.trainable_variables()
 
         with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
-            before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
-                                               initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
-                                               trainable=False,
-                                               dtype=tf.float32)
-                            for i, v in enumerate(tvars)}
+            before_grads = [tf.get_variable(f"{v.name.split(':')[0]}_{i}",
+                                            initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
+                                            trainable=False,
+                                            dtype=tf.float32)
+                            for i, v in enumerate(tvars)]
 
         initialized_variable_names = {}
         scaffold_fn = None
@@ -1861,8 +1861,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
             #     return grads
             new_grads = []
-            for i, v in enumerate(tvars):
-                new_grads.append(tf.assign(before_grads[v], grads[i]))
+            for i in range(len(tvars)):
+                new_grads.append(tf.assign(before_grads[i], grads[i]))
 
             grads = new_grads
             # def save_grads():
