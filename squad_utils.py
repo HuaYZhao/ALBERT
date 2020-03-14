@@ -1743,12 +1743,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         tvars = tf.trainable_variables()
 
-        # with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
-        #     before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
-        #                                        initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
-        #                                        trainable=False,
-        #                                        dtype=tf.float32)
-        #                     for i, v in enumerate(tvars)}
+        with tf.variable_scope("saving", reuse=tf.AUTO_REUSE):
+            before_grads = {v: tf.get_variable(f"{v.name.split(':')[0]}_{i}",
+                                               initializer=lambda: tf.zeros_like(v, dtype=tf.float32),
+                                               trainable=False,
+                                               dtype=tf.float32)
+                            for i, v in enumerate(tvars)}
 
         initialized_variable_names = {}
         scaffold_fn = None
