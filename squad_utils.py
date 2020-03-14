@@ -1852,7 +1852,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             def sum_grads():
                 nonlocal grads
                 for i, v in enumerate(tvars):
-                    grads[i] += before_grads[v]
+                    grads[i] = before_grads[v] + grads[i]
                 (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
                 return grads
 
