@@ -26,7 +26,7 @@ import tensorflow.compat.v1 as tf
 from tensorflow.contrib import tpu as contrib_tpu
 
 
-def create_optimizer(grads, init_lr, num_train_steps, num_warmup_steps, use_tpu,
+def create_optimizer(grads, init_lr, num_train_steps, num_warmup_steps, use_tpu, adv_step,
                      optimizer="adamw", poly_power=1.0, start_warmup_step=0):
     """Creates an optimizer training op."""
     global_step = tf.train.get_or_create_global_step()
@@ -111,11 +111,12 @@ def create_optimizer(grads, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # However, neither `AdamWeightDecayOptimizer` nor `LAMBOptimizer` do this.
     # But if you use a different optimizer, you should probably take this line
     # out.
-    # increase_step = tf.cond(growth_step, lambda: 1, lambda: 0)
-    # new_global_step = global_step + tf.cast(increase_step, tf.int64)
-    new_global_step = global_step + 1
+    increase_step = tf.cond(tf.equal(adv_step % 3, 2), lambda: 1, lambda: 0)
+    new_global_step = global_step + tf.cast(increase_step, tf.int64)
+    # new_global_step = global_step + 1
     train_op = tf.group(train_op, [global_step.assign(new_global_step)])
     return train_op
+
 
 class AdamWeightDecayOptimizer(tf.train.Optimizer):
     """A basic Adam optimizer that includes "correct" L2 weight decay."""

@@ -1824,7 +1824,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             total_loss = loss_rate * get_loss(outputs, features)
 
             # Adds gradient to embedding and recomputes classification loss.
-            def _scale_l2(x, norm_length):
+            def scale_l2(x, norm_length):
                 # shape(x) = (batch, num_timesteps, d)
                 # Divide x by max(abs(x)) for a numerically stable L2 norm.
                 # 2norm(x) = a * 2norm(x/a)
@@ -1835,77 +1835,50 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 x_unit = x / l2_norm
                 return norm_length * x_unit
 
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
+            def compute_perturb():
+                grad, = tf.gradients(
+                    total_loss,
+                    outputs["word_embedding_output"])
+                grad = tf.stop_gradient(grad)
+                return scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
 
-            grads = tf.gradients(total_loss, tvars)
-            grads = before_grads
+            perturb = tf.cond(tf.equal(adv_step, 0), compute_perturb, lambda: tf.zeros_like(perturb_embedding_inputs))
 
-            # def save_grads():
-            #     # nonlocal grads
-            #     for i, v in enumerate(tvars):
-            #         g = tf.assign(before_grads[v], grads[i])
-            #         grads[i] = g
-            #     return grads
-            #
-            # def sum_grads():
-            #     # nonlocal grads
-            #     # new_grads = []
-            #     # for i, v in enumerate(tvars):
-            #     #     g = before_grads[v] + grads[i]
-            #     #     grads[i] = g
-            #     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-            #     return grads
-            # new_grads = []
-            # for i in range(len(tvars)):
-            #     new_grads.append(grads[i] + before_grads[i])
-            #
-            # grads = new_grads
+            def save_grads():
+                return [tf.assign(before_grads[v], grads[i]) for i, v in enumerate(tvars)]
 
-            # grads = [g + before_grads[i] for i, g in enumerate(grads)]
+            def update_grads():
+                return tf.gradients(total_loss, tvars)
 
-            # def save_grads():
-            #     new_grads = []
-            #     for i, v in enumerate(tvars):
-            #         new_grads.append(tf.assign(before_grads[v], grads[i]))
-            #     return new_grads
-            #
-            # def sum_grads():
-            #     # new_grads = []
-            #     # for i, v in enumerate(tvars):
-            #     #     new_grad = grads[i] + before_grads[v]
-            #     #     new_grads.append(new_grad)
-            #     # (new_grads, _) = tf.clip_by_global_norm(new_grads, clip_norm=1.0)
-            #     return grads
-            #
-            # grads = tf.cond(tf.equal(adv_step, 0), save_grads, sum_grads)
+            def update_backup_grads():
+                return before_grads
 
-            # train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
-            #                    lambda: optimization.create_optimizer(
-            #                        list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu))
-            #
-            # with tf.control_dependencies([train_op]):
-            #     adv_assign_op = tf.assign(adv_step, 1 - adv_step)
-            #     perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
-            #
+            grads = tf.case((tf.equal(adv_step, 0), save_grads),
+                            (tf.equal(adv_step, 1), update_grads),
+                            (tf.equal(adv_step, 2), update_backup_grads))
+
+            train_op = tf.cond(tf.equal(adv_step, 0), lambda: tf.no_op(),
+                               lambda: optimization.create_optimizer(
+                                   list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+                                   adv_step))
+            with tf.control_dependencies([train_op]):
+                adv_assign_op = tf.assign(adv_step, (adv_step + 1) % 3)
+                perturb_assign_op = tf.assign(perturb_embedding_inputs, perturb)
+
             # group_ops = tf.cond(tf.equal(adv_step, 0),
             #                     lambda: tf.group(perturb_assign_op, adv_assign_op),
             #                     lambda: tf.group(train_op, perturb_assign_op, adv_assign_op))
-            group_ops = optimization.create_optimizer(
-                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            group_ops = tf.group(train_op,perturb_assign_op,adv_assign_op)
 
-            # def save_loss():
-            #     loss = tf.assign(before_loss, total_loss)
-            #     return loss
-            #
-            # def sum_loss():
-            #     loss = total_loss + before_loss
-            #     return loss
-            #
-            # merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
+            def save_loss():
+                loss = tf.assign(before_loss, total_loss)
+                return loss
+
+            def sum_loss():
+                loss = total_loss + before_loss
+                return loss
+
+            merge_loss = tf.cond(tf.equal(adv_step, 0), save_loss, sum_loss)
 
             from adversarial.hook import GlaceHook
 
