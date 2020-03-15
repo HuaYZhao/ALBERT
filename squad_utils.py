@@ -1767,7 +1767,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     scaffold_fn=scaffold_fn,
                     # training_hooks=[glace]
                 )
-                elif mode == tf.estimator.ModeKeys.PREDICT:
+            elif mode == tf.estimator.ModeKeys.PREDICT:
                 predictions = {
                     "unique_ids": features["unique_ids"],
                     "start_top_index": outputs["start_top_index"],
@@ -1778,7 +1778,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 }
                 output_spec = contrib_tpu.TPUEstimatorSpec(
                     mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
-                else:
+            else:
                 raise ValueError(
                     "Only TRAIN and PREDICT modes are supported: %s" % (mode))
 
