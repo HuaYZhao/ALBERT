@@ -1621,9 +1621,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         for name in sorted(features.keys()):
             tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
 
+        unique_ids = features["unique_ids"]
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
+        p_mask = features["p_mask"]
+        bsz = modeling.get_shape_list(input_ids)[0]
+        embedding_size = albert_config.embedding_size
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         with options({'constant_folding': True}):
@@ -1715,12 +1719,28 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     total_loss += regression_loss * 0.5
                     return total_loss
 
-                raw_loss = get_loss(outputs, features)
+                total_loss = get_loss(outputs, features)
 
-                raw_perturb = tf.gradients(raw_loss, outputs["word_embedding_output"])[0]
-                perturb = 0.2 * tf.stop_gradient(
-                    tf.nn.l2_normalize(raw_perturb * tf.cast(tf.expand_dims(input_mask, axis=-1), tf.float32),
-                                       dim=[0, 1, 2]))
+                # Adds gradient to embedding and recomputes classification loss.
+                def _scale_l2(x, norm_length):
+                    # shape(x) = (batch, num_timesteps, d)
+                    # Divide x by max(abs(x)) for a numerically stable L2 norm.
+                    # 2norm(x) = a * 2norm(x/a)
+                    # Scale over the full sequence, dims (1, 2)
+                    alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                    l2_norm = alpha * tf.sqrt(
+                        tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                    x_unit = x / l2_norm
+                    return norm_length * x_unit
+
+                grad, = tf.gradients(
+                    total_loss,
+                    outputs["word_embedding_output"])
+                grad = tf.stop_gradient(grad)
+                perturb = _scale_l2(grad, 0.125)  # set low for tpu mode   [5, 384, 128]
+
+                # grads_norm = tf.gradients(0.875 * total_loss, tvars)
+                # (grads_norm, _) = tf.clip_by_global_norm(grads_norm, clip_norm=1.0)
 
                 outputs_adv = create_v2_model(
                     albert_config=albert_config,
@@ -1737,16 +1757,24 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     hub_module=hub_module,
                     embedded_inputs=perturb)
 
-                loss = get_loss(outputs_adv, features)
+                adv_loss = get_loss(outputs_adv, features)
 
-                grads = tf.gradients(loss, tvars)
+                total_loss = 0.875 * total_loss + 0.125 * adv_loss
+
+                # grads_adv = tf.gradients(0.125 * adv_loss, tvars)
+                # (grads_adv, _) = tf.clip_by_global_norm(grads_adv, clip_norm=1.0)
+
+                # grads = [g1 + g2 for g1, g2 in zip(grads_norm, grads_adv)]
+
+                grads = tf.gradients(total_loss, tvars)
+                # _, global_norm1 = tf.clip_by_global_norm(grads_true, clip_norm=1.0)
                 (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-                train_op = optimization.create_optimizer(
-                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-                # optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
-                # train_op = optimizer.apply_gradients(
-                #     list(zip(grads, tvars)), global_step=tf.train.get_or_create_global_step())
+                # train_op = optimization.create_optimizer(
+                #     list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
+                train_op = optimizer.apply_gradients(
+                    list(zip(grads, tvars)), global_step=tf.train.get_or_create_global_step())
                 # save_grads = {"grads_norm": grads_norm,
                 #               "grads_adv": grads_adv,
                 #               "grads_true": grads_true}
@@ -1754,9 +1782,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 #
                 # glace = GlaceHook(save_grads)
 
+                print("all ops", tf.get_default_graph().get_operations())
                 output_spec = contrib_tpu.TPUEstimatorSpec(
                     mode=mode,
-                    loss=loss,
+                    loss=total_loss,
                     train_op=train_op,
                     scaffold_fn=scaffold_fn,
                     # training_hooks=[glace]
