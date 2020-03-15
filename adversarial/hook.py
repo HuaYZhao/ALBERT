@@ -33,7 +33,7 @@ class WritePerturbHook(SessionRunHook):
         self.ops = [unique_ids, perturb]
 
     def before_run(self, run_context):
-        return tf.estimator.SessionRunHook(self.ops)
+        return tf.estimator.SessionRunArgs(self.ops)
 
     def after_run(self,
                   run_context,  # pylint: disable=unused-argument
