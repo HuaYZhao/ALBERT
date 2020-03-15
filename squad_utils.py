@@ -1551,6 +1551,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
     else:
+        return_dict["start_log_probs"] = start_log_probs
+        return_dict["end_log_probs"] = end_log_probs
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
         return_dict["end_top_log_probs"] = end_top_log_probs
