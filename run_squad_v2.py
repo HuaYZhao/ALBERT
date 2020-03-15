@@ -545,14 +545,18 @@ def main(_):
 
         checkpoint_path = os.path.join(FLAGS.output_dir, "model.ckpt-best")
         perturb_dict = dict()
+        _id = 0
         for result in estimator.predict(
                 train_input_fn, yield_single_examples=True,
                 checkpoint_path=checkpoint_path):
             unique_id = int(result["unique_ids"])
             perturb = result["perturb"]
             perturb_dict[unique_id] = perturb
-        with tf.gfile.Open("perturb.json") as perturb_file:
-            json.dump(perturb_dict, perturb_file)
+            if len(perturb_dict.keys()) > 1000:
+                with tf.gfile.Open(f"perturb_{_id}.json") as perturb_file:
+                    json.dump(perturb_dict, perturb_file)
+                perturb_dict = {}
+                _id += 1
 
 
 if __name__ == "__main__":
