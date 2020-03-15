@@ -1631,6 +1631,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
+        print("shape", features["perturb"].shape)
         perturb = tf.reshape(features["perturb"], [-1, 384, 128])
 
         seq_length = modeling.get_shape_list(input_ids)[1]
