@@ -667,6 +667,7 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
         name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
+        name_to_features["perturb"] = tf.FixedLenFeature([], tf.int64)
 
     def _decode_record(record, name_to_features):
         """Decodes a record to a TensorFlow example."""
@@ -691,7 +692,12 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
 
         # For training, we want a lot of parallel reading and shuffling.
         # For eval, we want no shuffling and parallel reading doesn't matter.
-        d = tf.data.TFRecordDataset(input_file)
+        import os
+        dirname = os.path.dirname(input_file)
+        input_files = [os.path.join(dirname, fn) for fn in
+                       filter(lambda x: x.startswith('train.record'), tf.gfile.ListDirectory(dirname))]
+
+        d = tf.data.TFRecordDataset(input_files)
         if is_training:
             d = d.repeat()
             d = d.shuffle(buffer_size=100, seed=1)
@@ -1625,11 +1631,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
+        perturb = tf.reshape(features["perturb"], [-1, 384, 128])
 
         seq_length = modeling.get_shape_list(input_ids)[1]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         is_gen_perturb = (mode == tf.estimator.ModeKeys.PREDICT) and "start_positions" in features
+
+        random = tf.random_uniform([], 0, 1, dtype=tf.float32)
+
+        embedded_inputs = tf.cond(tf.less(random, 0.15), lambda: perturb, lambda: tf.zeros_like(perturb))
+
         outputs = create_v2_model(
             albert_config=albert_config,
             is_training=is_training,
