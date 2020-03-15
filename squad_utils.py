@@ -649,7 +649,7 @@ class FeatureWriter(object):
         self._writer.close()
 
 
-def input_fn_builder(input_file, seq_length, is_training,
+def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
                      drop_remainder, use_tpu, bsz, is_v2):
     """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
@@ -663,7 +663,7 @@ def input_fn_builder(input_file, seq_length, is_training,
     if is_v2:
         name_to_features["p_mask"] = tf.FixedLenFeature([seq_length], tf.int64)
 
-    if is_training:
+    if is_training or do_gen_perturb:
         name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
@@ -1551,6 +1551,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
     else:
+        return_dict["start_log_probs"] = start_log_probs
+        return_dict["end_log_probs"] = end_log_probs
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
         return_dict["end_top_log_probs"] = end_top_log_probs
@@ -1675,6 +1677,25 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             loss = tf.reduce_mean(loss)
             return loss
 
+        def get_loss(outputs_, features_):
+            start_loss = compute_loss(
+                outputs_["start_log_probs"], features_["start_positions"])
+            end_loss = compute_loss(
+                outputs_["end_log_probs"], features_["end_positions"])
+
+            total_loss = (start_loss + end_loss) * 0.5
+
+            cls_logits = outputs["cls_logits"]
+            is_impossible = tf.reshape(features["is_impossible"], [-1])
+            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            regression_loss = tf.reduce_mean(regression_loss)
+
+            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # comparable to start_loss and end_loss
+            total_loss += regression_loss * 0.5
+            return total_loss
+
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
@@ -1696,25 +1717,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # # comparable to start_loss and end_loss
             # total_loss += regression_loss * 0.5
 
-            def get_loss(outputs_, features_):
-                start_loss = compute_loss(
-                    outputs_["start_log_probs"], features_["start_positions"])
-                end_loss = compute_loss(
-                    outputs_["end_log_probs"], features_["end_positions"])
+            total_loss = get_loss(outputs, features)
 
-                total_loss = (start_loss + end_loss) * 0.5
+            grads = tf.gradients(total_loss, tvars)
+            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-                cls_logits = outputs["cls_logits"]
-                is_impossible = tf.reshape(features["is_impossible"], [-1])
-                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                regression_loss = tf.reduce_mean(regression_loss)
+            train_op = optimization.create_optimizer(
+                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-                # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-                # comparable to start_loss and end_loss
-                total_loss += regression_loss * 0.5
-                return total_loss
-
+            output_spec = contrib_tpu.TPUEstimatorSpec(
+                mode=mode,
+                loss=total_loss,
+                train_op=train_op,
+                scaffold_fn=scaffold_fn)
+        elif mode == tf.estimator.ModeKeys.PREDICT:
             # Adds gradient to embedding and recomputes classification loss.
             def _scale_l2(x, norm_length):
                 alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
@@ -1723,42 +1739,23 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 x_unit = x / l2_norm
                 return norm_length * x_unit
 
-            total_loss = get_loss(outputs, features)
+            predictions = dict()
+            if "start_positions" in features:
+                total_loss = get_loss(outputs, features)
+                grad, = tf.gradients(
+                    total_loss,
+                    outputs["word_embedding_output"])
+                grad = tf.stop_gradient(grad)
+                perturb = _scale_l2(grad, 0.125)
+                predictions["perturb"] = perturb
 
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)
+            predictions["unique_ids"] = features["unique_ids"]
+            predictions["start_top_index"] = outputs["start_top_index"],
+            predictions["start_top_log_probs"] = outputs["start_top_log_probs"],
+            predictions["end_top_index"] = outputs["end_top_index"],
+            predictions["end_top_log_probs"] = outputs["end_top_log_probs"],
+            predictions["cls_logits"] = outputs["cls_logits"]
 
-            grads = tf.gradients(total_loss, tvars)
-            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-
-            train_op = optimization.create_optimizer(
-                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-
-            global_step = tf.train.get_or_create_global_step()
-
-            from adversarial.hook import WritePerturbHook
-
-            write_perturb_hook = WritePerturbHook(unique_ids, perturb)
-
-            output_spec = contrib_tpu.TPUEstimatorSpec(
-                mode=mode,
-                loss=total_loss,
-                train_op=global_step.assign_add(1),
-                scaffold_fn=scaffold_fn,
-                training_hooks=[write_perturb_hook]
-            )
-        elif mode == tf.estimator.ModeKeys.PREDICT:
-            predictions = {
-                "unique_ids": features["unique_ids"],
-                "start_top_index": outputs["start_top_index"],
-                "start_top_log_probs": outputs["start_top_log_probs"],
-                "end_top_index": outputs["end_top_index"],
-                "end_top_log_probs": outputs["end_top_log_probs"],
-                "cls_logits": outputs["cls_logits"]
-            }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         else:

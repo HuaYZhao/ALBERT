@@ -114,6 +114,8 @@ flags.DEFINE_integer(
 
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
 
+flags.DEFINE_bool("do_gen_perturb", True, "Whether to run generative perturb.")
+
 flags.DEFINE_bool("do_predict", False, "Whether to run eval on the dev set.")
 
 flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
@@ -318,12 +320,13 @@ def main(_):
         # tf.logging.info("  Num split examples = %d", train_writer.num_features)
         tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
         tf.logging.info("  Num steps = %d", num_train_steps)
-        del train_examples
+        # del train_examples
 
         train_input_fn = squad_utils.input_fn_builder(
             input_file=FLAGS.train_feature_file,
             seq_length=FLAGS.max_seq_length,
             is_training=True,
+            do_gen_perturb=False,
             drop_remainder=True,
             use_tpu=FLAGS.use_tpu,
             bsz=FLAGS.train_batch_size,
@@ -374,6 +377,7 @@ def main(_):
             input_file=FLAGS.predict_feature_file,
             seq_length=FLAGS.max_seq_length,
             is_training=False,
+            do_gen_perturb=False,
             drop_remainder=False,
             use_tpu=FLAGS.use_tpu,
             bsz=FLAGS.predict_batch_size,
@@ -511,6 +515,44 @@ def main(_):
             tf.logging.info("  %s = %s", key, str(result[key]))
             writer.write("%s = %s\n" % (key, str(result[key])))
         writer.write("best perf happened at step: {}".format(global_step))
+
+    if FLAGS.do_gen_perturb:
+        if not tf.gfile.Exists(FLAGS.train_feature_file):
+            train_writer = squad_utils.FeatureWriter(
+                filename=os.path.join(FLAGS.train_feature_file), is_training=True)
+            squad_utils.convert_examples_to_features(
+                examples=train_examples,
+                tokenizer=tokenizer,
+                max_seq_length=FLAGS.max_seq_length,
+                doc_stride=FLAGS.doc_stride,
+                max_query_length=FLAGS.max_query_length,
+                is_training=True,
+                output_fn=train_writer.process_feature,
+                do_lower_case=FLAGS.do_lower_case)
+            train_writer.close()
+        tf.logging.info("***** Running generative perturb *****")
+        tf.logging.info("  Num orig examples = %d", len(train_examples))
+        del train_examples
+        train_input_fn = squad_utils.input_fn_builder(
+            input_file=FLAGS.train_feature_file,
+            seq_length=FLAGS.max_seq_length,
+            is_training=False,
+            do_gen_perturb=True,
+            drop_remainder=False,
+            use_tpu=FLAGS.use_tpu,
+            bsz=FLAGS.predict_batch_size,
+            is_v2=True)
+
+        checkpoint_path = os.path.join(FLAGS.output_dir, "model.ckpt-best")
+        perturb_dict = dict()
+        for result in estimator.predict(
+                train_input_fn, yield_single_examples=True,
+                checkpoint_path=checkpoint_path):
+            unique_id = int(result["unique_ids"])
+            perturb = result["perturb"]
+            perturb_dict[unique_id] = perturb
+        with tf.gfile.Open("perturb.json") as perturb_file:
+            json.dump(perturb_dict, perturb_file)
 
 
 if __name__ == "__main__":
