@@ -1748,6 +1748,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                     outputs["word_embedding_output"])
                 grad = tf.stop_gradient(grad)
                 perturb = _scale_l2(grad, 0.125)
+                predictions["unique_ids"] = features["unique_ids"]
                 predictions["perturb"] = perturb
             else:
                 predictions["unique_ids"] = features["unique_ids"]
