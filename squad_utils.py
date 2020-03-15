@@ -1443,7 +1443,7 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
     return all_predictions, scores_diff_json
 
 
-def create_v2_model(albert_config, is_training, input_ids, input_mask,
+def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module, embedded_inputs=None):
@@ -1480,7 +1480,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     # logit of the end position
     with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
-        if is_training:
+        if is_training or is_gen_perturb:
             # during training, compute the end logits based on the
             # ground truth of the start position
             start_positions = tf.reshape(features["start_positions"], [-1])
@@ -1547,12 +1547,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                 end_top_index,
                 [-1, start_n_top * end_n_top])
 
-    if is_training:
+    if is_training or is_gen_perturb:
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
     else:
-        return_dict["start_log_probs"] = start_log_probs
-        return_dict["end_log_probs"] = end_log_probs
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
         return_dict["end_top_log_probs"] = end_top_log_probs
@@ -1631,9 +1629,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         seq_length = modeling.get_shape_list(input_ids)[1]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
+        is_gen_perturb = (mode == tf.estimator.ModeKeys.PREDICT) and "start_positions" in features
         outputs = create_v2_model(
             albert_config=albert_config,
             is_training=is_training,
+            is_gen_perturb=is_gen_perturb,
             input_ids=input_ids,
             input_mask=input_mask,
             segment_ids=segment_ids,
@@ -1680,9 +1680,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             return loss
 
         def get_loss(outputs_, features_):
-            print("shape1", features_["start_positions"].shape)
-            print("shape2", outputs_["start_log_probs"].shape)
-
             start_loss = compute_loss(
                 outputs_["start_log_probs"], features_["start_positions"])
             end_loss = compute_loss(
@@ -1752,13 +1749,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 grad = tf.stop_gradient(grad)
                 perturb = _scale_l2(grad, 0.125)
                 predictions["perturb"] = perturb
-
-            predictions["unique_ids"] = features["unique_ids"]
-            predictions["start_top_index"] = outputs["start_top_index"]
-            predictions["start_top_log_probs"] = outputs["start_top_log_probs"]
-            predictions["end_top_index"] = outputs["end_top_index"]
-            predictions["end_top_log_probs"] = outputs["end_top_log_probs"]
-            predictions["cls_logits"] = outputs["cls_logits"]
+            else:
+                predictions["unique_ids"] = features["unique_ids"]
+                predictions["start_top_index"] = outputs["start_top_index"]
+                predictions["start_top_log_probs"] = outputs["start_top_log_probs"]
+                predictions["end_top_index"] = outputs["end_top_index"]
+                predictions["end_top_log_probs"] = outputs["end_top_log_probs"]
+                predictions["cls_logits"] = outputs["cls_logits"]
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
