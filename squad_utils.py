@@ -1626,157 +1626,140 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         segment_ids = features["segment_ids"]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-        with options({'constant_folding': True}):
-            outputs = create_v2_model(
-                albert_config=albert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                segment_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings,
-                features=features,
-                max_seq_length=max_seq_length,
-                start_n_top=start_n_top,
-                end_n_top=end_n_top,
-                dropout_prob=dropout_prob,
-                hub_module=hub_module,
-                embedded_inputs=None)
+        outputs = create_v2_model(
+            albert_config=albert_config,
+            is_training=is_training,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            segment_ids=segment_ids,
+            use_one_hot_embeddings=use_one_hot_embeddings,
+            features=features,
+            max_seq_length=max_seq_length,
+            start_n_top=start_n_top,
+            end_n_top=end_n_top,
+            dropout_prob=dropout_prob,
+            hub_module=hub_module,
+            embedded_inputs=None)
 
-            tvars = tf.trainable_variables()
+        tvars = tf.trainable_variables()
 
-            initialized_variable_names = {}
-            scaffold_fn = None
-            if init_checkpoint:
-                (assignment_map, initialized_variable_names
-                 ) = modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
-                if use_tpu:
+        initialized_variable_names = {}
+        scaffold_fn = None
+        if init_checkpoint:
+            (assignment_map, initialized_variable_names
+             ) = modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
+            if use_tpu:
 
-                    def tpu_scaffold():
-                        tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
-                        return tf.train.Scaffold()
-
-                    scaffold_fn = tpu_scaffold
-                else:
+                def tpu_scaffold():
                     tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+                    return tf.train.Scaffold()
 
-            tf.logging.info("**** Trainable Variables ****")
-            for var in tvars:
-                init_string = ""
-                if var.name in initialized_variable_names:
-                    init_string = ", *INIT_FROM_CKPT*"
-                tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
-                                init_string)
-
-            output_spec = None
-            if mode == tf.estimator.ModeKeys.TRAIN:
-                seq_length = modeling.get_shape_list(input_ids)[1]
-
-                def compute_loss(log_probs, positions):
-                    one_hot_positions = tf.one_hot(
-                        positions, depth=seq_length, dtype=tf.float32)
-
-                    loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-                    loss = tf.reduce_mean(loss)
-                    return loss
-
-                # start_loss = compute_loss(
-                #     outputs["start_log_probs"], features["start_positions"])
-                # end_loss = compute_loss(
-                #     outputs["end_log_probs"], features["end_positions"])
-                #
-                # total_loss = (start_loss + end_loss) * 0.5
-                #
-                # cls_logits = outputs["cls_logits"]
-                # is_impossible = tf.reshape(features["is_impossible"], [-1])
-                # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                # regression_loss = tf.reduce_mean(regression_loss)
-                #
-                # # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-                # # comparable to start_loss and end_loss
-                # total_loss += regression_loss * 0.5
-
-                def get_loss(outputs_, features_):
-                    start_loss = compute_loss(
-                        outputs_["start_log_probs"], features_["start_positions"])
-                    end_loss = compute_loss(
-                        outputs_["end_log_probs"], features_["end_positions"])
-
-                    total_loss = (start_loss + end_loss) * 0.5
-
-                    cls_logits = outputs["cls_logits"]
-                    is_impossible = tf.reshape(features["is_impossible"], [-1])
-                    regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                    regression_loss = tf.reduce_mean(regression_loss)
-
-                    # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-                    # comparable to start_loss and end_loss
-                    total_loss += regression_loss * 0.5
-                    return total_loss
-
-                raw_loss = get_loss(outputs, features)
-
-                raw_perturb = tf.gradients(raw_loss, outputs["word_embedding_output"])[0]
-                perturb = 0.2 * tf.stop_gradient(
-                    tf.nn.l2_normalize(raw_perturb * tf.cast(tf.expand_dims(input_mask, axis=-1), tf.float32),
-                                       dim=[0, 1, 2]))
-
-                outputs_adv = create_v2_model(
-                    albert_config=albert_config,
-                    is_training=is_training,
-                    input_ids=input_ids,
-                    input_mask=input_mask,
-                    segment_ids=segment_ids,
-                    use_one_hot_embeddings=use_one_hot_embeddings,
-                    features=features,
-                    max_seq_length=max_seq_length,
-                    start_n_top=start_n_top,
-                    end_n_top=end_n_top,
-                    dropout_prob=dropout_prob,
-                    hub_module=hub_module,
-                    embedded_inputs=perturb)
-
-                loss = get_loss(outputs_adv, features)
-
-                grads = tf.gradients(loss, tvars)
-                (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-
-                train_op = optimization.create_optimizer(
-                    list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-                # optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
-                # train_op = optimizer.apply_gradients(
-                #     list(zip(grads, tvars)), global_step=tf.train.get_or_create_global_step())
-                # save_grads = {"grads_norm": grads_norm,
-                #               "grads_adv": grads_adv,
-                #               "grads_true": grads_true}
-                # from adversarial.hook import GlaceHook
-                #
-                # glace = GlaceHook(save_grads)
-
-                output_spec = contrib_tpu.TPUEstimatorSpec(
-                    mode=mode,
-                    loss=loss,
-                    train_op=train_op,
-                    scaffold_fn=scaffold_fn,
-                    # training_hooks=[glace]
-                )
-            elif mode == tf.estimator.ModeKeys.PREDICT:
-                predictions = {
-                    "unique_ids": features["unique_ids"],
-                    "start_top_index": outputs["start_top_index"],
-                    "start_top_log_probs": outputs["start_top_log_probs"],
-                    "end_top_index": outputs["end_top_index"],
-                    "end_top_log_probs": outputs["end_top_log_probs"],
-                    "cls_logits": outputs["cls_logits"]
-                }
-                output_spec = contrib_tpu.TPUEstimatorSpec(
-                    mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
+                scaffold_fn = tpu_scaffold
             else:
-                raise ValueError(
-                    "Only TRAIN and PREDICT modes are supported: %s" % (mode))
+                tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
-            return output_spec
+        tf.logging.info("**** Trainable Variables ****")
+        for var in tvars:
+            init_string = ""
+            if var.name in initialized_variable_names:
+                init_string = ", *INIT_FROM_CKPT*"
+            tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
+                            init_string)
+
+        def compute_loss(log_probs, positions):
+            one_hot_positions = tf.one_hot(
+                positions, depth=seq_length, dtype=tf.float32)
+
+            loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+            loss = tf.reduce_mean(loss)
+            return loss
+
+        def get_loss(outputs_, features_):
+            start_loss = compute_loss(
+                outputs_["start_log_probs"], features_["start_positions"])
+            end_loss = compute_loss(
+                outputs_["end_log_probs"], features_["end_positions"])
+
+            total_loss = (start_loss + end_loss) * 0.5
+
+            cls_logits = outputs["cls_logits"]
+            is_impossible = tf.reshape(features["is_impossible"], [-1])
+            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            regression_loss = tf.reduce_mean(regression_loss)
+
+            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # comparable to start_loss and end_loss
+            total_loss += regression_loss * 0.5
+            return total_loss
+
+        output_spec = None
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            seq_length = modeling.get_shape_list(input_ids)[1]
+
+            # start_loss = compute_loss(
+            #     outputs["start_log_probs"], features["start_positions"])
+            # end_loss = compute_loss(
+            #     outputs["end_log_probs"], features["end_positions"])
+            #
+            # total_loss = (start_loss + end_loss) * 0.5
+            #
+            # cls_logits = outputs["cls_logits"]
+            # is_impossible = tf.reshape(features["is_impossible"], [-1])
+            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            # regression_loss = tf.reduce_mean(regression_loss)
+            #
+            # # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # # comparable to start_loss and end_loss
+            # total_loss += regression_loss * 0.5
+
+            total_loss = get_loss(outputs, features)
+
+            grads = tf.gradients(total_loss, tvars)
+            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+
+            train_op = optimization.create_optimizer(
+                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+
+            output_spec = contrib_tpu.TPUEstimatorSpec(
+                mode=mode,
+                loss=total_loss,
+                train_op=train_op,
+                scaffold_fn=scaffold_fn, )
+        elif mode == tf.estimator.ModeKeys.PREDICT:
+            # Adds gradient to embedding and recomputes classification loss.
+            def _scale_l2(x, norm_length):
+                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
+                l2_norm = alpha * tf.sqrt(
+                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
+                x_unit = x / l2_norm
+                return norm_length * x_unit
+
+            total_loss = get_loss(outputs, features)
+
+            grad, = tf.gradients(
+                total_loss,
+                outputs["word_embedding_output"])
+            grad = tf.stop_gradient(grad)
+            perturb = _scale_l2(grad, 0.125)
+
+            predictions = {
+                "unique_ids": features["unique_ids"],
+                "start_top_index": outputs["start_top_index"],
+                "start_top_log_probs": outputs["start_top_log_probs"],
+                "end_top_index": outputs["end_top_index"],
+                "end_top_log_probs": outputs["end_top_log_probs"],
+                "cls_logits": outputs["cls_logits"],
+                "perturb": perturb,
+            }
+            output_spec = contrib_tpu.TPUEstimatorSpec(
+                mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
+        else:
+            raise ValueError(
+                "Only TRAIN and PREDICT modes are supported: %s" % (mode))
+
+        return output_spec
 
     return model_fn
 

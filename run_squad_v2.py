@@ -386,6 +386,7 @@ def main(_):
             reader = tf.train.NewCheckpointReader(checkpoint)
             global_step = reader.get_tensor(tf.GraphKeys.GLOBAL_STEP)
             all_results = []
+            perturb = {}
             for result in estimator.predict(
                     predict_input_fn, yield_single_examples=True,
                     checkpoint_path=checkpoint):
@@ -409,12 +410,16 @@ def main(_):
                         end_top_index=end_top_index,
                         cls_logits=cls_logits))
 
+                perturb[unique_id] = result["perturb"]
+
             output_prediction_file = os.path.join(
                 FLAGS.output_dir, "predictions.json")
             output_nbest_file = os.path.join(
                 FLAGS.output_dir, "nbest_predictions.json")
             output_null_log_odds_file = os.path.join(
                 FLAGS.output_dir, "null_odds.json")
+            output_perturb_file = os.path.join(FLAGS.output_dir, "perturb.json")
+            json.dump(perturb, open(output_perturb_file, 'w', encoding="utf-8"))
 
             result_dict = {}
             cls_dict = {}
