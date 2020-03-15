@@ -1628,6 +1628,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
 
+        seq_length = modeling.get_shape_list(input_ids)[1]
+
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         outputs = create_v2_model(
             albert_config=albert_config,
@@ -1698,7 +1700,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
-            seq_length = modeling.get_shape_list(input_ids)[1]
 
             # start_loss = compute_loss(
             #     outputs["start_log_probs"], features["start_positions"])
