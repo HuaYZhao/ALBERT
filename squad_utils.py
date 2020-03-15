@@ -1719,7 +1719,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
                 raw_perturb = tf.gradients(raw_loss, outputs["word_embedding_output"])[0]
                 print("shape1", raw_perturb.shape)
-                print("shape2", tf.cast(tf.expand_dims(input_mask, axis=-1).shape))
+                print("shape2", tf.cast(tf.expand_dims(input_mask, axis=-1), tf.float32).shape)
                 perturb = 0.2 * tf.stop_gradient(
                     tf.nn.l2_normalize(raw_perturb * tf.cast(tf.expand_dims(input_mask, axis=-1), tf.float32),
                                        dim=[0, 1, 2]))
