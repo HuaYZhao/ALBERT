@@ -1737,6 +1737,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             train_op = optimization.create_optimizer(
                 list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
+            global_step = tf.train.get_or_create_global_step()
+
             from adversarial.hook import WritePerturbHook
 
             write_perturb_hook = WritePerturbHook(unique_ids, perturb)
@@ -1744,7 +1746,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
-                train_op=tf.no_op(),
+                train_op=global_step.assign_add(1),
                 scaffold_fn=scaffold_fn,
                 training_hooks=[write_perturb_hook])
         elif mode == tf.estimator.ModeKeys.PREDICT:
