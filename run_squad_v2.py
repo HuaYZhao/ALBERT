@@ -553,8 +553,7 @@ def main(_):
             perturb = result["perturb"]
             perturb_dict[unique_id] = perturb
             if len(perturb_dict.keys()) > 1000:
-                with tf.gfile.Open(f"perturb_{_id}.json", "w") as perturb_file:
-                    json.dump(perturb_dict, perturb_file)
+                np.savez(f"perturb_{_id}.npz", **perturb_dict)
                 perturb_dict = {}
                 _id += 1
 
