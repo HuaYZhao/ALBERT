@@ -1680,6 +1680,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             return loss
 
         def get_loss(outputs_, features_):
+            print("shape1", features_["start_positions"].shape)
+            print("shape2", outputs_["start_log_probs"].shape)
+
             start_loss = compute_loss(
                 outputs_["start_log_probs"], features_["start_positions"])
             end_loss = compute_loss(
