@@ -1551,8 +1551,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
     else:
-        # return_dict["start_log_probs"] = start_log_probs
-        # return_dict["end_log_probs"] = end_log_probs
+        return_dict["start_log_probs"] = start_log_probs
+        return_dict["end_log_probs"] = end_log_probs
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
         return_dict["end_top_log_probs"] = end_top_log_probs
@@ -1740,20 +1740,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 return norm_length * x_unit
 
             predictions = dict()
-            # if "start_positions" in features:
-            #     total_loss = get_loss(outputs, features)
-            #     grad, = tf.gradients(
-            #         total_loss,
-            #         outputs["word_embedding_output"])
-            #     grad = tf.stop_gradient(grad)
-            #     perturb = _scale_l2(grad, 0.125)
-            #     predictions["perturb"] = perturb
+            if "start_positions" in features:
+                total_loss = get_loss(outputs, features)
+                grad, = tf.gradients(
+                    total_loss,
+                    outputs["word_embedding_output"])
+                grad = tf.stop_gradient(grad)
+                perturb = _scale_l2(grad, 0.125)
+                predictions["perturb"] = perturb
 
             predictions["unique_ids"] = features["unique_ids"]
-            predictions["start_top_index"] = outputs["start_top_index"],
-            predictions["start_top_log_probs"] = outputs["start_top_log_probs"],
-            predictions["end_top_index"] = outputs["end_top_index"],
-            predictions["end_top_log_probs"] = outputs["end_top_log_probs"],
+            predictions["start_top_index"] = outputs["start_top_index"]
+            predictions["start_top_log_probs"] = outputs["start_top_log_probs"]
+            predictions["end_top_index"] = outputs["end_top_index"]
+            predictions["end_top_log_probs"] = outputs["end_top_log_probs"]
             predictions["cls_logits"] = outputs["cls_logits"]
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
