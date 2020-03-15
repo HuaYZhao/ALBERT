@@ -551,7 +551,7 @@ def main(_):
                 checkpoint_path=checkpoint_path):
             unique_id = int(result["unique_ids"])
             perturb = result["perturb"]
-            perturb_dict[unique_id] = perturb
+            perturb_dict[str(unique_id)] = perturb
             if len(perturb_dict.keys()) > 1000:
                 np.savez(f"perturb_{_id}.npz", **perturb_dict)
                 perturb_dict = {}
