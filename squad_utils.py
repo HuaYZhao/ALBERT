@@ -1748,7 +1748,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss=total_loss,
                 train_op=global_step.assign_add(1),
                 scaffold_fn=scaffold_fn,
-                # training_hooks=[write_perturb_hook]
+                training_hooks=[write_perturb_hook]
             )
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
