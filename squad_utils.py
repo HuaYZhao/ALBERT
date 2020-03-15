@@ -667,7 +667,7 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
         name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
-        name_to_features["perturb"] = tf.FixedLenFeature([], tf.float32)
+        name_to_features["perturb"] = tf.FixedLenFeature([384, 128], tf.float32)
 
     def _decode_record(record, name_to_features):
         """Decodes a record to a TensorFlow example."""
