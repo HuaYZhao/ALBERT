@@ -649,7 +649,7 @@ class FeatureWriter(object):
         self._writer.close()
 
 
-def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb, is_adv_training,
+def input_fn_builder(input_file, seq_length, is_training,
                      drop_remainder, use_tpu, bsz, is_v2):
     """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
@@ -663,12 +663,10 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb, is_adv
     if is_v2:
         name_to_features["p_mask"] = tf.FixedLenFeature([seq_length], tf.int64)
 
-    if is_training or do_gen_perturb:
+    if is_training:
         name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
-    if is_adv_training:
-        name_to_features["perturb"] = tf.FixedLenFeature([384, 128], tf.float32)
 
     def _decode_record(record, name_to_features):
         """Decodes a record to a TensorFlow example."""
@@ -693,16 +691,7 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb, is_adv
 
         # For training, we want a lot of parallel reading and shuffling.
         # For eval, we want no shuffling and parallel reading doesn't matter.
-        # input_file
-        if is_adv_training:
-            import os
-            dirname = os.path.dirname(input_file)
-            input_files = [os.path.join(dirname, fn) for fn in
-                           filter(lambda x: x.startswith('train.record'), tf.gfile.ListDirectory(dirname))]
-        else:
-            input_files = input_file
-
-        d = tf.data.TFRecordDataset(input_files)
+        d = tf.data.TFRecordDataset(input_file)
         if is_training:
             d = d.repeat()
             d = d.shuffle(buffer_size=100)
@@ -1454,12 +1443,12 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
     return all_predictions, scores_diff_json
 
 
-def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input_mask,
+def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                    hub_module, embedded_inputs=None):
+                    hub_module):
     """Creates a classification model."""
-    (_, output, _, word_embedding_output) = fine_tuning_utils.create_albert(
+    (_, output) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1467,19 +1456,17 @@ def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input
         segment_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=True,
-        hub_module=hub_module,
-        embedded_inputs=embedded_inputs)
+        hub_module=hub_module)
 
     bsz = tf.shape(output)[0]
-    return_dict = dict()
-    return_dict["word_embedding_output"] = word_embedding_output
+    return_dict = {}
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
     # logit of the start position
-    with tf.variable_scope("start_logits", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("start_logits"):
         start_logits = tf.layers.dense(
             output,
             1,
@@ -1490,8 +1477,8 @@ def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
     # logit of the end position
-    with tf.variable_scope("end_logits", reuse=tf.AUTO_REUSE):
-        if is_training or is_gen_perturb:
+    with tf.variable_scope("end_logits"):
+        if is_training:
             # during training, compute the end logits based on the
             # ground truth of the start position
             start_positions = tf.reshape(features["start_positions"], [-1])
@@ -1558,7 +1545,7 @@ def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input
                 end_top_index,
                 [-1, start_n_top * end_n_top])
 
-    if is_training or is_gen_perturb:
+    if is_training:
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
     else:
@@ -1568,7 +1555,7 @@ def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input
         return_dict["end_top_index"] = end_top_index
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("answer_class"):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
@@ -1606,19 +1593,6 @@ def create_v2_model(albert_config, is_training, is_gen_perturb, input_ids, input
     return return_dict
 
 
-import contextlib
-
-
-@contextlib.contextmanager
-def options(options):
-    old_opts = tf.config.optimizer.get_experimental_options()
-    tf.config.optimizer.set_experimental_options(options)
-    try:
-        yield
-    finally:
-        tf.config.optimizer.set_experimental_options(old_opts)
-
-
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1632,29 +1606,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         for name in sorted(features.keys()):
             tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
 
-        unique_ids = features["unique_ids"]
+        # unique_ids = features["unique_ids"]
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
 
-        seq_length = modeling.get_shape_list(input_ids)[1]
-
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-        is_adv_training = "perturb" in features
-        is_gen_perturb = (mode == tf.estimator.ModeKeys.PREDICT) and "start_positions" in features
-
-        embedded_inputs = None
-        if is_adv_training:
-            tf.logging.info("**** is adversarial training ****")
-            perturb = tf.reshape(features["perturb"], [-1, 384, 128])
-            xishu = tf.fill(perturb.shape, tf.cast(tf.random_uniform([]) < 0.15, tf.float32))
-            # embedded_inputs = tf.cond(tf.less(random, 0.), lambda: perturb, lambda: tf.zeros_like(perturb))
-            embedded_inputs = xishu * perturb * 0.15
 
         outputs = create_v2_model(
             albert_config=albert_config,
             is_training=is_training,
-            is_gen_perturb=is_gen_perturb,
             input_ids=input_ids,
             input_mask=input_mask,
             segment_ids=segment_ids,
@@ -1664,8 +1625,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             start_n_top=start_n_top,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
-            hub_module=hub_module,
-            embedded_inputs=embedded_inputs)
+            hub_module=hub_module)
 
         tvars = tf.trainable_variables()
 
@@ -1692,19 +1652,22 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
                             init_string)
 
-        def compute_loss(log_probs, positions):
-            one_hot_positions = tf.one_hot(
-                positions, depth=seq_length, dtype=tf.float32)
+        output_spec = None
+        if mode == tf.estimator.ModeKeys.TRAIN:
+            seq_length = modeling.get_shape_list(input_ids)[1]
 
-            loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-            loss = tf.reduce_mean(loss)
-            return loss
+            def compute_loss(log_probs, positions):
+                one_hot_positions = tf.one_hot(
+                    positions, depth=seq_length, dtype=tf.float32)
 
-        def get_loss(outputs_, features_):
+                loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+                loss = tf.reduce_mean(loss)
+                return loss
+
             start_loss = compute_loss(
-                outputs_["start_log_probs"], features_["start_positions"])
+                outputs["start_log_probs"], features["start_positions"])
             end_loss = compute_loss(
-                outputs_["end_log_probs"], features_["end_positions"])
+                outputs["end_log_probs"], features["end_positions"])
 
             total_loss = (start_loss + end_loss) * 0.5
 
@@ -1717,37 +1680,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
-            return total_loss
-
-        output_spec = None
-        if mode == tf.estimator.ModeKeys.TRAIN:
-
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
-            #
-            # total_loss = (start_loss + end_loss) * 0.5
-            #
-            # cls_logits = outputs["cls_logits"]
-            # is_impossible = tf.reshape(features["is_impossible"], [-1])
-            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            # regression_loss = tf.reduce_mean(regression_loss)
-            #
-            # # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # # comparable to start_loss and end_loss
-            # total_loss += regression_loss * 0.5
-
-            total_loss = get_loss(outputs, features)
-
-            grads = tf.gradients(total_loss, tvars)
-            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-
             train_op = optimization.create_optimizer(
-                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
-            # optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
-            # train_op = optimizer.minimize(total_loss)
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
@@ -1755,32 +1689,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
-            # Adds gradient to embedding and recomputes classification loss.
-            def _scale_l2(x, norm_length):
-                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-                l2_norm = alpha * tf.sqrt(
-                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-                x_unit = x / l2_norm
-                return norm_length * x_unit
-
-            predictions = dict()
-            if "start_positions" in features:
-                total_loss = get_loss(outputs, features)
-                grad, = tf.gradients(
-                    total_loss,
-                    outputs["word_embedding_output"])
-                grad = tf.stop_gradient(grad)
-                perturb = _scale_l2(grad, 0.125)
-                predictions["unique_ids"] = features["unique_ids"]
-                predictions["perturb"] = perturb
-            else:
-                predictions["unique_ids"] = features["unique_ids"]
-                predictions["start_top_index"] = outputs["start_top_index"]
-                predictions["start_top_log_probs"] = outputs["start_top_log_probs"]
-                predictions["end_top_index"] = outputs["end_top_index"]
-                predictions["end_top_log_probs"] = outputs["end_top_log_probs"]
-                predictions["cls_logits"] = outputs["cls_logits"]
-
+            predictions = {
+                "unique_ids": features["unique_ids"],
+                "start_top_index": outputs["start_top_index"],
+                "start_top_log_probs": outputs["start_top_log_probs"],
+                "end_top_index": outputs["end_top_index"],
+                "end_top_log_probs": outputs["end_top_log_probs"],
+                "cls_logits": outputs["cls_logits"]
+            }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         else:
