@@ -72,6 +72,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # As report in the Bert pulic github, the learning rate for SQuAD 1.1 finetune
     # is 3e-5, 4e-5 or 5e-5. For LAMB, the users can use 3e-4, 4e-4,or 5e-4 for a
     # batch size of 64 in the finetune.
+    optimizer_name = optimizer
     if optimizer == "adamw":
         tf.logging.info("using adamw")
         optimizer = AdamWeightDecayOptimizer(
@@ -125,8 +126,9 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # However, neither `AdamWeightDecayOptimizer` nor `LAMBOptimizer` do this.
     # But if you use a different optimizer, you should probably take this line
     # out.
-    new_global_step = global_step + 1
-    train_op = tf.group(train_op, [global_step.assign(new_global_step)])
+    if optimizer_name != "adafactor":
+        new_global_step = global_step + 1
+        train_op = tf.group(train_op, [global_step.assign(new_global_step)])
     return train_op
 
 
