@@ -1664,7 +1664,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module,
-            embedded_inputs=embedded_inputs)
+            embedded_inputs=None)
 
         tvars = tf.trainable_variables()
 
