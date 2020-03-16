@@ -33,7 +33,7 @@ import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
@@ -1744,8 +1744,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             grads = tf.gradients(total_loss, tvars)
             (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
-            train_op = optimization.create_optimizer(
-                list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            # train_op = optimization.create_optimizer(
+            #     list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
+            train_op = optimizer.apply_gradients(
+                grads, global_step=tf.train.get_or_create_global_step())
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
