@@ -705,7 +705,7 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb, is_adv
         d = tf.data.TFRecordDataset(input_files)
         if is_training:
             d = d.repeat()
-            d = d.shuffle(buffer_size=100, seed=1)
+            d = d.shuffle(buffer_size=100)
 
         d = d.apply(
             contrib_data.map_and_batch(
@@ -1664,7 +1664,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module,
-            embedded_inputs=None)
+            embedded_inputs=embedded_inputs)
 
         tvars = tf.trainable_variables()
 
