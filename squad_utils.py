@@ -1647,9 +1647,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if is_adv_training:
             tf.logging.info("**** is adversarial training ****")
             perturb = tf.reshape(features["perturb"], [-1, 384, 128])
-            xishu = tf.fill(perturb.shape, tf.cast(tf.random_uniform([]) < 0., tf.float32))
+            xishu = tf.fill(perturb.shape, tf.cast(tf.random_uniform([]) < 0.15, tf.float32))
             # embedded_inputs = tf.cond(tf.less(random, 0.), lambda: perturb, lambda: tf.zeros_like(perturb))
-            embedded_inputs = xishu * perturb * 0.15
+            embedded_inputs = xishu * perturb * 0.5
 
         outputs = create_v2_model(
             albert_config=albert_config,
