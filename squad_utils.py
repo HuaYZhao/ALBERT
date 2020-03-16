@@ -649,7 +649,7 @@ class FeatureWriter(object):
         self._writer.close()
 
 
-def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
+def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb, is_adv_training,
                      drop_remainder, use_tpu, bsz, is_v2):
     """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
@@ -667,6 +667,7 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
         name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
         name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
+    if is_adv_training:
         name_to_features["perturb"] = tf.FixedLenFeature([384, 128], tf.float32)
 
     def _decode_record(record, name_to_features):
@@ -692,10 +693,14 @@ def input_fn_builder(input_file, seq_length, is_training, do_gen_perturb,
 
         # For training, we want a lot of parallel reading and shuffling.
         # For eval, we want no shuffling and parallel reading doesn't matter.
-        import os
-        dirname = os.path.dirname(input_file)
-        input_files = [os.path.join(dirname, fn) for fn in
-                       filter(lambda x: x.startswith('train.record'), tf.gfile.ListDirectory(dirname))]
+        # input_file
+        if is_adv_training:
+            import os
+            dirname = os.path.dirname(input_file)
+            input_files = [os.path.join(dirname, fn) for fn in
+                           filter(lambda x: x.startswith('train.record'), tf.gfile.ListDirectory(dirname))]
+        else:
+            input_files = input_file
 
         d = tf.data.TFRecordDataset(input_files)
         if is_training:

@@ -114,6 +114,8 @@ flags.DEFINE_integer(
 
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
 
+flags.DEFINE_bool("do_adv_train", True, "Whether to run adversarial training.")
+
 flags.DEFINE_bool("do_gen_perturb", False, "Whether to run generative perturb.")
 
 flags.DEFINE_bool("do_predict", False, "Whether to run eval on the dev set.")
@@ -326,6 +328,7 @@ def main(_):
             input_file=FLAGS.train_feature_file,
             seq_length=FLAGS.max_seq_length,
             is_training=True,
+            is_adv_training=FLAGS.do_adv_train,
             do_gen_perturb=False,
             drop_remainder=True,
             use_tpu=FLAGS.use_tpu,
@@ -377,6 +380,7 @@ def main(_):
             input_file=FLAGS.predict_feature_file,
             seq_length=FLAGS.max_seq_length,
             is_training=False,
+            is_adv_training=False,
             do_gen_perturb=False,
             drop_remainder=False,
             use_tpu=FLAGS.use_tpu,
@@ -537,6 +541,7 @@ def main(_):
             input_file=FLAGS.train_feature_file,
             seq_length=FLAGS.max_seq_length,
             is_training=False,
+            is_adv_training=False,
             do_gen_perturb=True,
             drop_remainder=False,
             use_tpu=FLAGS.use_tpu,
