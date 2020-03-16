@@ -1741,14 +1741,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             total_loss = get_loss(outputs, features)
 
-            grads = tf.gradients(total_loss, tvars)
-            (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+            # grads = tf.gradients(total_loss, tvars)
+            # (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
             # train_op = optimization.create_optimizer(
             #     list(zip(grads, tvars)), learning_rate, num_train_steps, num_warmup_steps, use_tpu)
             optimizer = contrib_tpu.CrossShardOptimizer(tf.train.GradientDescentOptimizer(learning_rate))
-            train_op = optimizer.apply_gradients(
-                grads, global_step=tf.train.get_or_create_global_step())
+            train_op = optimizer.minimize(total_loss)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
