@@ -206,7 +206,7 @@ class AlbertModel(object):
                     word_embedding_name="word_embeddings",
                     use_one_hot_embeddings=use_one_hot_embeddings)
                 if embedded_inputs is not None:
-                    self.word_embedding_output = self.word_embedding_output + tf.stop_gradient(embedded_inputs)
+                    self.word_embedding_output = tf.stop_gradient(self.word_embedding_output + embedded_inputs)
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
