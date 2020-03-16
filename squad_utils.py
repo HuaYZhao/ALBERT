@@ -1636,17 +1636,18 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
-        print("shape", features["perturb"].shape)
-        perturb = tf.reshape(features["perturb"], [-1, 384, 128])
 
         seq_length = modeling.get_shape_list(input_ids)[1]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         is_gen_perturb = (mode == tf.estimator.ModeKeys.PREDICT) and "start_positions" in features
 
-        random = tf.random_uniform([], 0, 1, dtype=tf.float32)
-
-        embedded_inputs = tf.cond(tf.less(random, 0.15), lambda: perturb, lambda: tf.zeros_like(perturb))
+        is_adv_training = True if "perturb" in features else False
+        embedded_inputs = None
+        if is_adv_training:
+            perturb = tf.reshape(features["perturb"], [-1, 384, 128])
+            random = tf.random_uniform([], 0, 1, dtype=tf.float32)
+            embedded_inputs = tf.cond(tf.less(random, 0.15), lambda: perturb, lambda: tf.zeros_like(perturb))
 
         outputs = create_v2_model(
             albert_config=albert_config,
