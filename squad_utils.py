@@ -1689,7 +1689,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
                 def compute_ss_loss(log_probs, positions, name):
                     y = tf.gather(full_position_embedding, positions)
-                    print("shape1", y.shape)
 
                     y_ = tf.layers.dense(sequence_output,
                                          albert_config.embedding_size,
@@ -1697,10 +1696,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                              albert_config.initializer_range),
                                          name=name)
                     y_ = tf.reduce_sum(tf.einsum(" bse, bs -> bse", y_, log_probs), axis=1)
-                    print("shape2", y_.shape)
 
                     loss = tf.nn.softmax_cross_entropy_with_logits(logits=y_, labels=y)
-                    return loss
+                    return tf.reduce_mean(loss)
 
                 ss_loss = compute_ss_loss(outputs["start_log_probs"], features["start_positions"], "start_ss") + \
                           compute_ss_loss(outputs["end_log_probs"], features["end_positions"], "end_ss")
