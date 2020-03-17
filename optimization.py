@@ -80,7 +80,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
             learning_rate=learning_rate,
             weight_decay_rate=0.01,
             beta_1=0.9,
-            beta_2=0.99,
+            beta_2=0.999,
             epsilon=1e-6,
             exclude_from_weight_decay=["LayerNorm", "layer_norm", "bias"])
     elif optimizer == "lamb":
@@ -95,12 +95,12 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     elif optimizer == "adafactor":
         tf.logging.info("using adafactor")
         optimizer = AdafactorOptimizer(
-            multiply_by_parameter_scale=True,
+            multiply_by_parameter_scale=False,
             learning_rate=learning_rate,
-            decay_rate=adafactor_decay_rate_adam(0.999),
+            decay_rate=None,
             beta1=0.0,
             clipping_threshold=1.0,
-            factored=True,
+            factored=False,
             simulated_quantize_bits=None,
             parameter_encoding=None,
             use_locking=False,
