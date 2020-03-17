@@ -1696,7 +1696,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                                          kernel_initializer=modeling.create_initializer(
                                              albert_config.initializer_range),
                                          name=name)
-                    y_ = tf.reduce_sum(y_ * log_probs, axis=1)
+                    y_ = tf.reduce_sum(tf.einsum(" bse, bs -> bse", y_, log_probs), axis=1)
                     print("shape2", y_.shape)
 
                     loss = tf.nn.softmax_cross_entropy_with_logits(logits=y_, labels=y)
