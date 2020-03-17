@@ -95,7 +95,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     elif optimizer == "adafactor":
         tf.logging.info("using adafactor")
         optimizer = AdafactorOptimizer(
-            multiply_by_parameter_scale=False,
+            multiply_by_parameter_scale=True,
             learning_rate=learning_rate,
             decay_rate=adafactor_decay_rate_adam(0.999),
             beta1=0.0,
