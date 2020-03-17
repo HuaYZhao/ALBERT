@@ -207,7 +207,7 @@ class AlbertModel(object):
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
-                self.embedding_output = embedding_postprocessor(
+                self.embedding_output, self.full_position_embeddings = embedding_postprocessor(
                     input_tensor=self.word_embedding_output,
                     use_token_type=True,
                     token_type_ids=token_type_ids,
@@ -282,6 +282,9 @@ class AlbertModel(object):
           corresponding to the output of the word(piece) embedding layer.
         """
         return self.word_embedding_output
+
+    def get_full_position_embedding_output(self):
+        return self.full_position_embeddings
 
     def get_embedding_output(self):
         """Gets output of the embedding lookup (i.e., input to the transformer).
@@ -627,7 +630,7 @@ def embedding_postprocessor(input_tensor,
             output += position_embeddings
 
     output = layer_norm_and_dropout(output, dropout_prob)
-    return output
+    return output, full_position_embeddings
 
 
 def einsum_via_matmul(input_tensor, w, num_inner_dims):

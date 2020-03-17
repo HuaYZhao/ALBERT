@@ -1448,7 +1448,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
+    (_, output, full_position_embedding) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1460,6 +1460,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
+    return_dict["sequence_output"] = output
+    return_dict["full_position_embedding"] = full_position_embedding
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
@@ -1680,6 +1682,30 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
+
+            with tf.variable_scope("ss", reuse=tf.AUTO_REUSE):
+                sequence_output = outputs["sequence_output"]  # [bs, 384, hidden]
+                full_position_embedding = outputs["full_position_embedding"]  # [512, 128]
+
+                def compute_ss_loss(log_probs, positions, name):
+                    y = tf.gather(full_position_embedding, positions)
+                    print("shape1", y.sahpe)
+
+                    y_ = tf.layers.dense(sequence_output,
+                                         albert_config.embedding_size,
+                                         kernel_initializer=modeling.create_initializer(
+                                             albert_config.initializer_range),
+                                         name=name)
+                    y_ = tf.reduce_sum(y_, axis=1)
+                    print("shape2", y_.shape)
+
+                    loss = tf.nn.softmax_cross_entropy_with_logits(logits=y_, labels=y)
+                    return loss
+
+                ss_loss = compute_ss_loss(outputs["start_log_probs"], features["start_positions"], "start_ss") + \
+                          compute_ss_loss(outputs["end_log_probs"], features["end_positions"], "end_ss")
+                total_loss += 0.5 * ss_loss
+
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
 
