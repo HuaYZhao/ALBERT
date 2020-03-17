@@ -23,8 +23,8 @@ import lamb_optimizer
 import six
 from six.moves import zip
 import tensorflow.compat.v1 as tf
-from tensor2tensor.utils.adafactor import adafactor_decay_rate_adam
-from tensor2tensor.utils.adafactor import AdafactorOptimizer
+from adafactor import adafactor_decay_rate_adam
+from adafactor import AdafactorOptimizer
 from tensorflow.contrib import tpu as contrib_tpu
 
 
@@ -97,7 +97,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
         optimizer = AdafactorOptimizer(
             multiply_by_parameter_scale=False,
             learning_rate=learning_rate,
-            decay_rate=None,
+            decay_rate=adafactor_decay_rate_adam(0.999),
             beta1=0.0,
             clipping_threshold=1.0,
             factored=True,
