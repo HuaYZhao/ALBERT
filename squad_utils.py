@@ -1481,7 +1481,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         return_dict["efv_logits"] = efv_logits
 
-    with tf.variable_scope("bert/encoder/transformer/group_0/inner_group_0/",reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("bert/encoder/transformer/group_0/inner_group_0", reuse=tf.AUTO_REUSE):
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
         passage_mask = tf.cast(segment_ids, tf.float32)
