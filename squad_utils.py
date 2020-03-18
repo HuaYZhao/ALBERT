@@ -1593,6 +1593,63 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return return_dict
 
 
+def create_v2_answer_model(albert_config, is_training, input_ids, input_mask,
+                           segment_ids, use_one_hot_embeddings, features,
+                           max_seq_length, start_n_top, end_n_top, dropout_prob,
+                           hub_module, name):
+    """Creates a classification model."""
+    (_, output) = fine_tuning_utils.create_albert(
+        albert_config=albert_config,
+        is_training=is_training,
+        input_ids=input_ids,
+        input_mask=input_mask,
+        segment_ids=segment_ids,
+        use_one_hot_embeddings=use_one_hot_embeddings,
+        use_einsum=True,
+        hub_module=hub_module,
+        name=name)
+
+    bsz = tf.shape(output)[0]
+    return_dict = {}
+
+    # invalid position mask such as query and special symbols (PAD, SEP, CLS)
+    p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
+
+    output = tf.transpose(output, [1, 0, 2])
+
+    # an additional layer to predict answerability
+    with tf.variable_scope("answer_class"):
+        # get the representation of CLS
+        cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
+                               max_seq_length,
+                               axis=-1, dtype=tf.float32)
+        cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
+
+        # note(zhiliny): no dependency on end_feature so that we can obtain
+        # one single `cls_logits` for each sample
+        ans_feature = tf.layers.dense(
+            cls_feature,
+            albert_config.hidden_size,
+            activation=tf.tanh,
+            kernel_initializer=modeling.create_initializer(
+                albert_config.initializer_range),
+            name="dense_0")
+        ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
+                                        training=is_training)
+        cls_logits = tf.layers.dense(
+            ans_feature,
+            1,
+            kernel_initializer=modeling.create_initializer(
+                albert_config.initializer_range),
+            name="dense_1",
+            use_bias=False)
+        cls_logits = tf.squeeze(cls_logits, -1)
+
+        return_dict["cls_logits"] = cls_logits
+
+    return return_dict
+
+
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
@@ -1626,6 +1683,21 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_n_top=end_n_top,
             dropout_prob=dropout_prob,
             hub_module=hub_module)
+
+        outputs_answer = create_v2_answer_model(
+            albert_config=albert_config,
+            is_training=is_training,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            segment_ids=segment_ids,
+            use_one_hot_embeddings=use_one_hot_embeddings,
+            features=features,
+            max_seq_length=max_seq_length,
+            start_n_top=start_n_top,
+            end_n_top=end_n_top,
+            dropout_prob=dropout_prob,
+            hub_module=hub_module,
+            name="answer")
 
         tvars = tf.trainable_variables()
 
@@ -1669,7 +1741,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_loss = compute_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
-            # total_loss = (start_loss + end_loss) * 0.5
+            total_loss = (start_loss + end_loss) * 0.5
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -1679,15 +1751,21 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
-            total_loss = 0.
             total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
+            regression_loss_answer = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=outputs_answer["cls_logits"])
+            regression_loss_answer = tf.reduce_mean(regression_loss_answer)
+
+            train_op2 = optimization.create_optimizer(
+                regression_loss_answer, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
+
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
-                train_op=train_op,
+                train_op=tf.group(train_op, train_op2),
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
@@ -1696,7 +1774,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 "start_top_log_probs": outputs["start_top_log_probs"],
                 "end_top_index": outputs["end_top_index"],
                 "end_top_log_probs": outputs["end_top_log_probs"],
-                "cls_logits": outputs["cls_logits"]
+                "cls_logits": (outputs["cls_logits"] + outputs_answer["cls_logits"]) / 2
             }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
