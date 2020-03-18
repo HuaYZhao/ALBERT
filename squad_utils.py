@@ -1464,7 +1464,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
-    with tf.variable_scope("matching_attention"):
+    with tf.variable_scope("co_attention"):
 
         question_mask = tf.cast(
             tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
@@ -1472,11 +1472,12 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         encoded_question = output * tf.expand_dims(question_mask, 2)
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
-        from modeling import co_attention_ffn_block
+        from modeling import co_attention_ffn_block, dot_product_attention
 
-        output = co_attention_ffn_block(encoded_passage, encoded_question,
-                                        # attention_mask=passage_mask,
-                                        attention_head_size=albert_config.hidden_size)
+        # output = co_attention_ffn_block(encoded_passage, encoded_question,
+        #                                 # attention_mask=passage_mask,
+        #                                 attention_head_size=albert_config.hidden_size)
+        output = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
 
     output = tf.transpose(output, [1, 0, 2])
     # logit of the start position
