@@ -1618,7 +1618,7 @@ def create_v2_answer_model(albert_config, is_training, input_ids, input_mask,
     output = tf.transpose(output, [1, 0, 2])
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class"):
+    with tf.variable_scope("answer_model"):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
