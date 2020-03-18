@@ -1474,7 +1474,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         encoded_passage = output * tf.expand_dims(passage_mask, 2)
         from modeling import co_attention_ffn_block
 
-        output = co_attention_ffn_block(encoded_passage, encoded_question, attention_mask=passage_mask)
+        output = co_attention_ffn_block(encoded_passage, encoded_question,
+                                        attention_mask=passage_mask,
+                                        attention_head_size=albert_config.hidden_size)
 
     output = tf.transpose(output, [1, 0, 2])
     # logit of the start position
