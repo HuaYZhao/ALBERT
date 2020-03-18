@@ -1477,7 +1477,10 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # output = co_attention_ffn_block(encoded_passage, encoded_question,
         #                                 # attention_mask=passage_mask,
         #                                 attention_head_size=albert_config.hidden_size)
-        output = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        q_aware_passage = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
+        p_aware_question = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
+
+        output = dot_product_attention(p_aware_question, q_aware_passage, q_aware_passage, bias=None)
 
     output = tf.transpose(output, [1, 0, 2])
     # logit of the start position
