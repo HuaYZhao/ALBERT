@@ -422,7 +422,7 @@ def main(_):
             with tf.gfile.GFile(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(result_dict, indent=4) + "\n")
 
-            return {"accuracy": accuracy,"total":len(eval_examples)}
+            return {"accuracy": accuracy, "total": len(eval_examples)}
 
         def _find_valid_cands(curr_step):
             filenames = tf.gfile.ListDirectory(FLAGS.output_dir)

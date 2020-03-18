@@ -1268,20 +1268,15 @@ def accumulate_predictions_v2(result_dict, cls_dict, all_examples,
 
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
-        score_null = 1000000  # large and positive
 
         for (feature_index, feature) in enumerate(features):
             if feature.unique_id not in result_dict[example_index]:
                 result_dict[example_index][feature.unique_id] = {}
             result = unique_id_to_result[feature.unique_id]
-            cur_null_score = result.cls_logits
 
-            # if we could have irrelevant answers, get the min score of irrelevant
-            score_null = min(score_null, cur_null_score)
-
-        if example_index not in cls_dict:
-            cls_dict[example_index] = []
-        cls_dict[example_index].append(score_null)
+            if example_index not in cls_dict:
+                cls_dict[example_index] = []
+            cls_dict[example_index].append(result.cls_logits)
 
 
 def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
@@ -1555,7 +1550,6 @@ def evaluate_v2(result_dict, cls_dict, prediction_json, eval_examples,
     example_index_to_features = collections.defaultdict(list)
     for feature in eval_features:
         example_index_to_features[feature.example_index].append(feature)
-
 
     for (example_index, example) in enumerate(eval_examples):
         features = eval_features[example_index]
