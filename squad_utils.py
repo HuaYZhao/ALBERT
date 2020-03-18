@@ -1700,7 +1700,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
                 ss_loss = compute_ss_loss(outputs["start_log_probs"], features["start_positions"], "start_ss") + \
                           compute_ss_loss(outputs["end_log_probs"], features["end_positions"], "end_ss")
-                total_loss += 0.5 * ss_loss
+                total_loss += 0.1 * ss_loss
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
