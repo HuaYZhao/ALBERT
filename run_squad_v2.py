@@ -437,7 +437,7 @@ def main(_):
 
         output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
         checkpoint_path = os.path.join(FLAGS.output_dir, "model.ckpt-best")
-        key_name = "f1"
+        key_name = "accuracy"
         writer = tf.gfile.GFile(output_eval_file, "w")
         if tf.gfile.Exists(checkpoint_path + ".index"):
             result = get_result(checkpoint_path)
