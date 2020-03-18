@@ -1481,18 +1481,18 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         return_dict["efv_logits"] = efv_logits
 
-    # with tf.variable_scope("co_attention"):
-    question_mask = tf.cast(
-        tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-    passage_mask = tf.cast(segment_ids, tf.float32)
+    with tf.variable_scope("bert/encoder/transformer/group_0/inner_group_0/",reuse=tf.AUTO_REUSE):
+        question_mask = tf.cast(
+            tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+        passage_mask = tf.cast(segment_ids, tf.float32)
 
-    encoded_question = output * tf.expand_dims(question_mask, 2)
-    encoded_passage = output * tf.expand_dims(passage_mask, 2)
-    from modeling import co_attention_ffn_block, dot_product_attention
+        encoded_question = output * tf.expand_dims(question_mask, 2)
+        encoded_passage = output * tf.expand_dims(passage_mask, 2)
+        from modeling import co_attention_ffn_block, dot_product_attention
 
-    output = co_attention_ffn_block(encoded_passage, encoded_question,
-                                    # attention_mask=passage_mask,
-                                    attention_head_size=albert_config.hidden_size)
+        output = co_attention_ffn_block(encoded_passage, encoded_question,
+                                        # attention_mask=passage_mask,
+                                        attention_head_size=albert_config.hidden_size)
     # q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
     # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
     #
