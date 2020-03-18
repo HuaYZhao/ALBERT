@@ -53,8 +53,7 @@ RawResult = collections.namedtuple("RawResult",
 
 RawResultV2 = collections.namedtuple(
     "RawResultV2",
-    ["unique_id", "start_top_log_probs", "start_top_index",
-     "end_top_log_probs", "end_top_index", "cls_logits"])
+    ["unique_id",  "cls_logits"])
 
 
 class SquadExample(object):
