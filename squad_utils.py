@@ -1460,11 +1460,23 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
-    output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
+    with tf.variable_scope("matching_attention"):
+
+        question_mask = tf.cast(
+            tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
+        passage_mask = tf.cast(segment_ids, tf.float32)
+
+        encoded_question = output * tf.expand_dims(question_mask, 2)
+        encoded_passage = output * tf.expand_dims(passage_mask, 2)
+        from modeling import co_attention_ffn_block
+
+        output = co_attention_ffn_block(encoded_passage, encoded_question, attention_mask=passage_mask)
+
+    output = tf.transpose(output, [1, 0, 2])
     # logit of the start position
     with tf.variable_scope("start_logits"):
         start_logits = tf.layers.dense(
@@ -1681,7 +1693,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
