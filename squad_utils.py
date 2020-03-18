@@ -1463,54 +1463,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
-    with tf.variable_scope("efv"):
-        # get the representation of CLS
-        cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
-                               max_seq_length,
-                               axis=-1, dtype=tf.float32)
-        cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
-
-        efv_logits = tf.layers.dense(
-            cls_feature,
-            1,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range),
-            name="dense_1",
-            use_bias=False)
-        efv_logits = tf.squeeze(efv_logits, -1)
-
-        return_dict["efv_logits"] = efv_logits
-
-    with tf.variable_scope("bert/encoder/transformer/group_0/inner_group_0", reuse=tf.AUTO_REUSE):
-        question_mask = tf.cast(
-            tf.logical_and(tf.cast(input_mask, tf.bool), tf.logical_not(tf.cast(segment_ids, tf.bool))), tf.float32)
-        passage_mask = tf.cast(segment_ids, tf.float32)
-
-        encoded_question = output * tf.expand_dims(question_mask, 2)
-        encoded_passage = output * tf.expand_dims(passage_mask, 2)
-        from modeling import co_attention_ffn_block, dot_product_attention
-
-        output = co_attention_ffn_block(encoded_passage, encoded_question,
-                                        # attention_mask=passage_mask,
-                                        attention_head_size=albert_config.hidden_size)
-    # q_aware_passage = dot_product_attention(encoded_passage, encoded_question, encoded_question, bias=None)
-    # p_aware_question = dot_product_attention(encoded_question, encoded_passage, encoded_passage, bias=None)
-    #
-    # self_att_p = tf.einsum(" blh, bLh -> blL ", q_aware_passage, q_aware_passage)
-    # intermediate_self_aware_p = tf.einsum(" blL, bL -> blL ", tf.nn.softmax(self_att_p, axis=2), passage_mask)
-    # self_aware_passage = tf.einsum(" bLl, blh -> bLh ", intermediate_self_aware_p, q_aware_passage)
-    #
-    # intermediate_p = dot_product_attention(self_aware_passage, q_aware_passage, q_aware_passage, bias=None)
-    # contextual_p = attention_ffn_block(intermediate_p, hidden_size=768, attention_head_size=768,
-    #                                    attention_mask=passage_mask)  # [bs, seq_len, hidden]
-    #
-    # intermediate_q = attention_ffn_block(p_aware_question, hidden_size=768, attention_head_size=768,
-    #                                      attention_mask=question_mask)
-    # gamma = tf.squeeze(tf.nn.softmax(tf.layers.dense(intermediate_q, 1, use_bias=False), axis=1),
-    #                    2) * question_mask  # [bs, q_l]
-    # contextual_q = tf.einsum(" bl, ble -> ble ", gamma, intermediate_q)
-    #
-    # output = dot_product_attention(contextual_q, contextual_p, contextual_p, bias=None)
 
     output = tf.transpose(output, [1, 0, 2])
     # logit of the start position
@@ -1717,7 +1669,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_loss = compute_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            # total_loss = (start_loss + end_loss) * 0.5
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -1727,6 +1679,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
+            total_loss = 0.
             total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
