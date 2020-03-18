@@ -1752,20 +1752,19 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
-            train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             regression_loss_answer = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=tf.cast(is_impossible, dtype=tf.float32), logits=outputs_answer["cls_logits"])
             regression_loss_answer = tf.reduce_mean(regression_loss_answer)
 
-            train_op2 = optimization.create_optimizer(
-                regression_loss_answer, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
+            total_loss += regression_loss_answer
+            train_op = optimization.create_optimizer(
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
-                train_op=tf.group(train_op, train_op2),
+                train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
