@@ -30,7 +30,7 @@ from tensorflow.contrib import tpu as contrib_tpu
 
 def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
                      optimizer="adamw", poly_power=1.0, start_warmup_step=0,
-                     colocate_gradients_with_ops=False):
+                     colocate_gradients_with_ops=False, growth_step=True):
     """Creates an optimizer training op."""
     global_step = tf.train.get_or_create_global_step()
 
@@ -127,7 +127,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # However, neither `AdamWeightDecayOptimizer` nor `LAMBOptimizer` do this.
     # But if you use a different optimizer, you should probably take this line
     # out.
-    if optimizer_name != "adafactor":
+    if optimizer_name != "adafactor" and growth_step:
         new_global_step = global_step + 1
         train_op = tf.group(train_op, [global_step.assign(new_global_step)])
     return train_op

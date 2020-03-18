@@ -53,8 +53,7 @@ RawResult = collections.namedtuple("RawResult",
 
 RawResultV2 = collections.namedtuple(
     "RawResultV2",
-    ["unique_id", "start_top_log_probs", "start_top_index",
-     "end_top_log_probs", "end_top_index", "cls_logits"])
+    ["unique_id",  "cls_logits"])
 
 
 class SquadExample(object):
@@ -1268,52 +1267,15 @@ def accumulate_predictions_v2(result_dict, cls_dict, all_examples,
 
         prelim_predictions = []
         # keep track of the minimum score of null start+end of position 0
-        score_null = 1000000  # large and positive
 
         for (feature_index, feature) in enumerate(features):
             if feature.unique_id not in result_dict[example_index]:
                 result_dict[example_index][feature.unique_id] = {}
             result = unique_id_to_result[feature.unique_id]
-            cur_null_score = result.cls_logits
 
-            # if we could have irrelevant answers, get the min score of irrelevant
-            score_null = min(score_null, cur_null_score)
-
-            doc_offset = feature.tokens.index("[SEP]") + 1
-            for i in range(start_n_top):
-                for j in range(end_n_top):
-                    start_log_prob = result.start_top_log_probs[i]
-                    start_index = result.start_top_index[i]
-
-                    j_index = i * end_n_top + j
-
-                    end_log_prob = result.end_top_log_probs[j_index]
-                    end_index = result.end_top_index[j_index]
-                    # We could hypothetically create invalid predictions, e.g., predict
-                    # that the start of the span is in the question. We throw out all
-                    # invalid predictions.
-                    if start_index - doc_offset >= len(feature.tok_start_to_orig_index):
-                        continue
-                    if start_index - doc_offset < 0:
-                        continue
-                    if end_index - doc_offset >= len(feature.tok_end_to_orig_index):
-                        continue
-                    if not feature.token_is_max_context.get(start_index, False):
-                        continue
-                    if end_index < start_index:
-                        continue
-                    length = end_index - start_index + 1
-                    if length > max_answer_length:
-                        continue
-                    start_idx = start_index - doc_offset
-                    end_idx = end_index - doc_offset
-                    if (start_idx, end_idx) not in result_dict[example_index][feature.unique_id]:
-                        result_dict[example_index][feature.unique_id][(start_idx, end_idx)] = []
-                    result_dict[example_index][feature.unique_id][(start_idx, end_idx)].append(
-                        (start_log_prob, end_log_prob))
-        if example_index not in cls_dict:
-            cls_dict[example_index] = []
-        cls_dict[example_index].append(score_null)
+            if example_index not in cls_dict:
+                cls_dict[example_index] = []
+            cls_dict[example_index].append(result.cls_logits)
 
 
 def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
@@ -1421,7 +1383,7 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
         assert len(nbest_json) >= 1
         assert best_non_null_entry is not None
 
-        score_diff = sum(cls_dict[example_index]) / len(cls_dict[example_index])
+        score_diff = sum(cls_dict[example_index]) / len(cls_dict[example_index])  # avg
         scores_diff_json[example.qas_id] = score_diff
         # predict null answers when null threshold is provided
         if null_score_diff_threshold is None or score_diff < null_score_diff_threshold:
@@ -1460,99 +1422,11 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
-    output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
-    # logit of the start position
-    with tf.variable_scope("start_logits"):
-        start_logits = tf.layers.dense(
-            output,
-            1,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range))
-        start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
-        start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
-        start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
-
-    # logit of the end position
-    with tf.variable_scope("end_logits"):
-        if is_training:
-            # during training, compute the end logits based on the
-            # ground truth of the start position
-            start_positions = tf.reshape(features["start_positions"], [-1])
-            start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                     dtype=tf.float32)
-            start_features = tf.einsum("lbh,bl->bh", output, start_index)
-            start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
-            end_logits = tf.layers.dense(
-                tf.concat([output, start_features], axis=-1),
-                albert_config.hidden_size,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                activation=tf.tanh,
-                name="dense_0")
-            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-
-            end_logits = tf.layers.dense(
-                end_logits,
-                1,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                name="dense_1")
-            end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
-            end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-        else:
-            # during inference, compute the end logits based on beam search
-
-            start_top_log_probs, start_top_index = tf.nn.top_k(
-                start_log_probs, k=start_n_top)
-            start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=tf.float32)
-            start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
-            end_input = tf.tile(output[:, :, None],
-                                [1, 1, start_n_top, 1])
-            start_features = tf.tile(start_features[None],
-                                     [max_seq_length, 1, 1, 1])
-            end_input = tf.concat([end_input, start_features], axis=-1)
-            end_logits = tf.layers.dense(
-                end_input,
-                albert_config.hidden_size,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                activation=tf.tanh,
-                name="dense_0")
-            end_logits = contrib_layers.layer_norm(end_logits, begin_norm_axis=-1)
-            end_logits = tf.layers.dense(
-                end_logits,
-                1,
-                kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range),
-                name="dense_1")
-            end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
-            end_logits = tf.transpose(end_logits, [1, 2, 0])
-            end_logits_masked = end_logits * (
-                    1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
-            end_top_log_probs, end_top_index = tf.nn.top_k(
-                end_log_probs, k=end_n_top)
-            end_top_log_probs = tf.reshape(
-                end_top_log_probs,
-                [-1, start_n_top * end_n_top])
-            end_top_index = tf.reshape(
-                end_top_index,
-                [-1, start_n_top * end_n_top])
-
-    if is_training:
-        return_dict["start_log_probs"] = start_log_probs
-        return_dict["end_log_probs"] = end_log_probs
-    else:
-        return_dict["start_top_log_probs"] = start_top_log_probs
-        return_dict["start_top_index"] = start_top_index
-        return_dict["end_top_log_probs"] = end_top_log_probs
-        return_dict["end_top_index"] = end_top_index
+    output = tf.transpose(output, [1, 0, 2])
 
     # an additional layer to predict answerability
     with tf.variable_scope("answer_class"):
@@ -1562,25 +1436,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                                axis=-1, dtype=tf.float32)
         cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
 
-        # get the representation of START
-        start_p = tf.nn.softmax(start_logits_masked, axis=-1,
-                                name="softmax_start")
-        start_feature = tf.einsum("lbh,bl->bh", output, start_p)
-
-        # note(zhiliny): no dependency on end_feature so that we can obtain
-        # one single `cls_logits` for each sample
-        ans_feature = tf.concat([start_feature, cls_feature], -1)
-        ans_feature = tf.layers.dense(
-            ans_feature,
-            albert_config.hidden_size,
-            activation=tf.tanh,
-            kernel_initializer=modeling.create_initializer(
-                albert_config.initializer_range),
-            name="dense_0")
-        ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
-                                        training=is_training)
         cls_logits = tf.layers.dense(
-            ans_feature,
+            cls_feature,
             1,
             kernel_initializer=modeling.create_initializer(
                 albert_config.initializer_range),
@@ -1656,46 +1513,24 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
 
-            def compute_loss(log_probs, positions):
-                one_hot_positions = tf.one_hot(
-                    positions, depth=seq_length, dtype=tf.float32)
-
-                loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-                loss = tf.reduce_mean(loss)
-                return loss
-
-            start_loss = compute_loss(
-                outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
-                outputs["end_log_probs"], features["end_positions"])
-
-            total_loss = (start_loss + end_loss) * 0.5
-
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
             regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
             regression_loss = tf.reduce_mean(regression_loss)
 
-            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
+                regression_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=total_loss,
+                loss=regression_loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
-                "start_top_index": outputs["start_top_index"],
-                "start_top_log_probs": outputs["start_top_log_probs"],
-                "end_top_index": outputs["end_top_index"],
-                "end_top_log_probs": outputs["end_top_log_probs"],
-                "cls_logits": outputs["cls_logits"]
+                "cls_logits": tf.nn.sigmoid(outputs["cls_logits"])
             }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
@@ -1712,40 +1547,12 @@ def evaluate_v2(result_dict, cls_dict, prediction_json, eval_examples,
                 eval_features, all_results, n_best_size, max_answer_length,
                 output_prediction_file, output_nbest_file,
                 output_null_log_odds_file):
-    null_score_diff_threshold = None
-    predictions, na_probs = write_predictions_v2(
-        result_dict, cls_dict, eval_examples, eval_features,
-        all_results, n_best_size, max_answer_length,
-        output_prediction_file, output_nbest_file,
-        output_null_log_odds_file, null_score_diff_threshold)
+    example_index_to_features = collections.defaultdict(list)
+    for feature in eval_features:
+        example_index_to_features[feature.example_index].append(feature)
 
-    na_prob_thresh = 1.0  # default value taken from the eval script
-    qid_to_has_ans = make_qid_to_has_ans(prediction_json)  # maps qid to True/False
-    has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
-    no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
-    exact_raw, f1_raw = get_raw_scores(prediction_json, predictions)
-    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
-                                          na_prob_thresh)
-    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
-                                       na_prob_thresh)
-    out_eval = make_eval_dict(exact_thresh, f1_thresh)
-    find_all_best_thresh(out_eval, predictions, exact_raw, f1_raw, na_probs, qid_to_has_ans)
-    null_score_diff_threshold = out_eval["best_f1_thresh"]
+    for (example_index, example) in enumerate(eval_examples):
+        features = eval_features[example_index]
+        score_diff = sum(cls_dict[example_index]) / len(cls_dict[example_index])  # avg
 
-    predictions, na_probs = write_predictions_v2(
-        result_dict, cls_dict, eval_examples, eval_features,
-        all_results, n_best_size, max_answer_length,
-        output_prediction_file, output_nbest_file,
-        output_null_log_odds_file, null_score_diff_threshold)
-
-    qid_to_has_ans = make_qid_to_has_ans(prediction_json)  # maps qid to True/False
-    has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
-    no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
-    exact_raw, f1_raw = get_raw_scores(prediction_json, predictions)
-    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
-                                          na_prob_thresh)
-    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
-                                       na_prob_thresh)
-    out_eval = make_eval_dict(exact_thresh, f1_thresh)
-    out_eval["null_score_diff_threshold"] = null_score_diff_threshold
-    return out_eval
+    return
