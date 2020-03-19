@@ -410,6 +410,7 @@ def main(_):
                 FLAGS.start_n_top, FLAGS.end_n_top)
 
             from squad_utils import make_qid_to_has_ans
+            import numpy as np
             qid_to_has_ans = make_qid_to_has_ans(prediction_json)  # maps qid to True/False
             has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
             no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
@@ -423,8 +424,8 @@ def main(_):
                 fp = 0
                 fn = 0
                 for example_index, example in enumerate(eval_examples):
-                    predict_is_impossible = max(cls_dict[example_index]) > threshold
-                    result_dict[example.qas_id] = max(cls_dict[example_index])
+                    predict_is_impossible = np.mean(cls_dict[example_index]) > threshold
+                    result_dict[example.qas_id] = np.mean(cls_dict[example_index])
                     if example.is_impossible:
                         if predict_is_impossible:
                             tp += 1
