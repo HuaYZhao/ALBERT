@@ -1512,7 +1512,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
 
-            def focal_loss(pred, y, alpha=0.75, gamma=3):
+            def focal_loss(pred, y, alpha=0.25, gamma=2):
                 pt = tf.nn.sigmoid(pred)
                 y = tf.cast(y, tf.float32)
                 loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
@@ -1538,7 +1538,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
-                "cls_logits": outputs["cls_logits"]
+                "cls_logits": tf.nn.sigmoid(outputs["cls_logits"])
             }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)

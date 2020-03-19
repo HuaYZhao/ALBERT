@@ -426,7 +426,8 @@ def main(_):
                 fn = 0
                 for example_index, example in enumerate(eval_examples):
                     m = np.mean(cls_dict[example_index])
-                    predict_is_impossible = 1 / (1 + np.exp(-m)) > threshold
+                    # predict_is_impossible = 1 / (1 + np.exp(-m)) > threshold
+                    predict_is_impossible = m > threshold
                     result_dict[example.qas_id] = m
                     if example.is_impossible:
                         if predict_is_impossible:
@@ -447,8 +448,8 @@ def main(_):
                 return precision, recall, f1
 
             # precision, recall, f1 = compute_metrics_with_threshold(0.4)
-            # precision, recall, f1 = compute_metrics_with_threshold(0.5)
-            precision, recall, f1 = compute_metrics_with_threshold(0.6)
+            precision, recall, f1 = compute_metrics_with_threshold(0.5)
+            # precision, recall, f1 = compute_metrics_with_threshold(0.6)
 
             with tf.gfile.GFile(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(result_dict, indent=4) + "\n")
