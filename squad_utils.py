@@ -1512,20 +1512,20 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
 
-            def focal_loss(pred, y, alpha=0.75, gamma=2):
-                pt = tf.nn.sigmoid(pred)
-                y = tf.cast(y, tf.float32)
-                loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
-                       (1 - alpha) * pt ** gamma * (1 - y) * tf.log(1 - pt)
-                loss = tf.reduce_mean(loss)
-                return loss
+            # def focal_loss(pred, y, alpha=0.75, gamma=2):
+            #     pt = tf.nn.sigmoid(pred)
+            #     y = tf.cast(y, tf.float32)
+            #     loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
+            #            (1 - alpha) * pt ** gamma * (1 - y) * tf.log(1 - pt)
+            #     loss = tf.reduce_mean(loss)
+            #     return loss
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
-            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            # loss = tf.reduce_mean(regression_loss)
-            loss = focal_loss(cls_logits, y=is_impossible)
+            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            loss = tf.reduce_mean(regression_loss)
+            # loss = focal_loss(cls_logits, y=is_impossible)
 
             train_op = optimization.create_optimizer(
                 loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
