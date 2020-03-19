@@ -1514,6 +1514,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             def focal_loss(pred, y, alpha=0.75, gamma=2):
                 pt = tf.nn.sigmoid(pred)
+                y = tf.cast(y, tf.float32)
                 loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
                        (1 - alpha) * pt ** gamma * (1 - y) * tf.log(1 - pt)
                 loss = tf.reduce_mean(loss)
