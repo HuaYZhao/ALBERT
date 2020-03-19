@@ -28,16 +28,25 @@ def make_qid_to_has_ans(dataset):
 
 
 qid_to_has_ans = make_qid_to_has_ans(json.load(open('./data/dev-v2.0.json', 'r', encoding='utf-8'))["data"])
-
 merge_prediction = deepcopy(prediction)
-for q_ids in prediction.keys():
-    if qid_to_has_ans[q_ids] and no_answer_prediction[q_ids] > 0.5:
-        print(no_answer_prediction[q_ids])
 
-    if no_answer_prediction[q_ids] > 0.99:
-        merge_prediction[q_ids] = ''
 
-json.dump(merge_prediction, open(merge_prediction_file, 'w', encoding='utf-8'), indent=4)
+def simple_replace():
+    for q_ids in prediction.keys():
+        if qid_to_has_ans[q_ids] and no_answer_prediction[q_ids] > 0.5:
+            print(no_answer_prediction[q_ids])
+
+        prob = 1 / (1 + np.exp(-no_answer_prediction[q_ids]))
+
+        if prob > 0.5:
+            merge_prediction[q_ids] = ''
+
+    json.dump(merge_prediction, open(merge_prediction_file, 'w', encoding='utf-8'), indent=4)
+
+
+def find_threshold():
+    pass
+
 
 xargs = "python ./data/eval.py ./data/dev-v2.0.json ./data/predictions.json"
 os.system(xargs)
