@@ -410,19 +410,37 @@ def main(_):
                 FLAGS.start_n_top, FLAGS.end_n_top)
 
             result_dict = {}
-            correct = 0
+            tp = 0
+            tn = 0
+            fp = 0
+            fn = 0
             for example_index, example in enumerate(eval_examples):
                 predict_is_impossible = max(cls_dict[example_index]) > 0.5
-                result_dict[example.qas_id] = int(predict_is_impossible)
-                if result_dict[example.qas_id] == example.is_impossible:
-                    correct += 1
-            accuracy = correct / len(eval_examples)
-            tf.logging.info(f"accuracy: {accuracy}")
+                result_dict[example.qas_id] = max(cls_dict[example_index])
+                if example.is_impossible:
+                    if predict_is_impossible:
+                        tp += 1
+                    else:
+                        fn += 1
+                else:
+                    if predict_is_impossible:
+                        fp += 1
+                    else:
+                        tn += 1
+            precision = tp / (tp + fp)
+            recall = tp / (fn + tp)
+            f1 = 2 * tp / (2 * tp + fp + fn)
+            tf.logging.info(f"precision: {precision}"
+                            f"recall: {recall}"
+                            f"f1: {f1}")
 
             with tf.gfile.GFile(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(result_dict, indent=4) + "\n")
 
-            return {"accuracy": accuracy, "total": len(eval_examples)}, int(global_step)
+            return {"precision": precision,
+                    "recall": recall,
+                    "f1": f1,
+                    "total": len(eval_examples)}, int(global_step)
 
         def _find_valid_cands(curr_step):
             filenames = tf.gfile.ListDirectory(FLAGS.output_dir)
@@ -437,7 +455,7 @@ def main(_):
 
         output_eval_file = os.path.join(FLAGS.output_dir, "eval_results.txt")
         checkpoint_path = os.path.join(FLAGS.output_dir, "model.ckpt-best")
-        key_name = "accuracy"
+        key_name = "f1"
         writer = tf.gfile.GFile(output_eval_file, "w")
         if tf.gfile.Exists(checkpoint_path + ".index"):
             result = get_result(checkpoint_path)
