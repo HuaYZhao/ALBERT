@@ -1513,22 +1513,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             seq_length = modeling.get_shape_list(input_ids)[1]
 
             def focal_loss(pred, y, alpha=0.75, gamma=2):
-                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
-
-                zeros = tf.zeros_like(pred, dtype=pred.dtype)
-
-                # For positive prediction, only need consider front part loss, back part is 0;
-                # target_tensor > zeros <=> z=1, so positive coefficient = z - p.
-                pos_p_sub = tf.where(y > zeros, y - pred, zeros)  # positive sample 寻找正样本，并进行填充
-
-                # For negative prediction, only need consider back part loss, front part is 0;
-                # target_tensor > zeros <=> z=1, so negative coefficient = 0.
-                neg_p_sub = tf.where(y > zeros, zeros, pred)  # negative sample 寻找负样本，并进行填充
-                per_entry_cross_ent = - alpha * tf.pow(pos_p_sub, gamma) * tf.log(tf.clip_by_value(pred, 1e-30, 1.0)) \
-                                      - (1 - alpha) * tf.pow(neg_p_sub, gamma) * tf.log(
-                    tf.clip_by_value(1.0 - pred, 1e-30, 1.0))
-
-                loss = tf.reduce_mean(tf.reduce_sum(per_entry_cross_ent, axis=-1))
+                pt = tf.nn.sigmoid(pred)
+                loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
+                       (1 - alpha) * pt ** gamma * (1 - y) * tf.log(1 - pt)
+                loss = tf.reduce_mean(loss)
                 return loss
 
             cls_logits = outputs["cls_logits"]
@@ -1543,7 +1531,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=regression_loss,
+                loss=loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
