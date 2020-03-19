@@ -409,32 +409,43 @@ def main(_):
                 all_results, FLAGS.n_best_size, FLAGS.max_answer_length,
                 FLAGS.start_n_top, FLAGS.end_n_top)
 
-            result_dict = {}
-            tp = 0
-            tn = 0
-            fp = 0
-            fn = 0
-            print([example.is_impossible for example in eval_examples])
-            for example_index, example in enumerate(eval_examples):
-                predict_is_impossible = max(cls_dict[example_index]) > 0.5
-                result_dict[example.qas_id] = max(cls_dict[example_index])
-                if example.is_impossible:
-                    if predict_is_impossible:
-                        tp += 1
+            from squad_utils import make_qid_to_has_ans
+            qid_to_has_ans = make_qid_to_has_ans(prediction_json)  # maps qid to True/False
+            has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
+            no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
+            print("has_ans", len(has_ans_qids))
+            print("no_ans", len(no_ans_qids))
+
+            def compute_metrics_with_threshold(threshold):
+                result_dict = {}
+                tp = 0
+                tn = 0
+                fp = 0
+                fn = 0
+                for example_index, example in enumerate(eval_examples):
+                    predict_is_impossible = max(cls_dict[example_index]) > threshold
+                    result_dict[example.qas_id] = max(cls_dict[example_index])
+                    if example.is_impossible:
+                        if predict_is_impossible:
+                            tp += 1
+                        else:
+                            fn += 1
                     else:
-                        fn += 1
-                else:
-                    if predict_is_impossible:
-                        fp += 1
-                    else:
-                        tn += 1
-            print(tp, tn, fp, fn)
-            precision = tp / (tp + fp)
-            recall = tp / (fn + tp)
-            f1 = 2 * tp / (2 * tp + fp + fn)
-            tf.logging.info(f"precision: {precision}"
-                            f"recall: {recall}"
-                            f"f1: {f1}")
+                        if predict_is_impossible:
+                            fp += 1
+                        else:
+                            tn += 1
+                precision = tp / (tp + fp)
+                recall = tp / (fn + tp)
+                f1 = 2 * tp / (2 * tp + fp + fn)
+                tf.logging.info(f"precision: {precision}"
+                                f"recall: {recall}"
+                                f"f1: {f1}")
+                return precision, recall, f1
+
+            precision, recall, f1 = compute_metrics_with_threshold(0.4)
+            precision, recall, f1 = compute_metrics_with_threshold(0.5)
+            precision, recall, f1 = compute_metrics_with_threshold(0.6)
 
             with tf.gfile.GFile(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(result_dict, indent=4) + "\n")
