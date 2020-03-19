@@ -414,6 +414,7 @@ def main(_):
             tn = 0
             fp = 0
             fn = 0
+            print([example.is_impossible for example in eval_examples])
             for example_index, example in enumerate(eval_examples):
                 predict_is_impossible = max(cls_dict[example_index]) > 0.5
                 result_dict[example.qas_id] = max(cls_dict[example_index])
