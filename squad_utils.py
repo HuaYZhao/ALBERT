@@ -53,7 +53,7 @@ RawResult = collections.namedtuple("RawResult",
 
 RawResultV2 = collections.namedtuple(
     "RawResultV2",
-    ["unique_id",  "cls_logits"])
+    ["unique_id", "cls_logits"])
 
 
 class SquadExample(object):
@@ -1512,14 +1512,34 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
 
+            def focal_loss(pred, y, alpha=0.75, gamma=2):
+                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
+
+                zeros = tf.zeros_like(pred, dtype=pred.dtype)
+
+                # For positive prediction, only need consider front part loss, back part is 0;
+                # target_tensor > zeros <=> z=1, so positive coefficient = z - p.
+                pos_p_sub = tf.where(y > zeros, y - pred, zeros)  # positive sample 寻找正样本，并进行填充
+
+                # For negative prediction, only need consider back part loss, front part is 0;
+                # target_tensor > zeros <=> z=1, so negative coefficient = 0.
+                neg_p_sub = tf.where(y > zeros, zeros, pred)  # negative sample 寻找负样本，并进行填充
+                per_entry_cross_ent = - alpha * tf.pow(pos_p_sub, gamma) * tf.log(tf.clip_by_value(pred, 1e-30, 1.0)) \
+                                      - (1 - alpha) * tf.pow(neg_p_sub, gamma) * tf.log(
+                    tf.clip_by_value(1.0 - pred, 1e-30, 1.0))
+
+                loss = tf.reduce_mean(tf.reduce_sum(per_entry_cross_ent, axis=-1))
+                return loss
+
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
-            regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-            regression_loss = tf.reduce_mean(regression_loss)
+            # regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            #     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+            # loss = tf.reduce_mean(regression_loss)
+            loss = focal_loss(cls_logits, y=is_impossible)
 
             train_op = optimization.create_optimizer(
-                regression_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
+                loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
