@@ -147,10 +147,9 @@ def read_squad_examples(input_file, is_training):
                 question_text = qa["question"]
                 start_position = None
                 orig_answer_text = None
-                is_impossible = False
+                is_impossible = qa.get("is_impossible", False)
 
                 if is_training:
-                    is_impossible = qa.get("is_impossible", False)
                     if (len(qa["answers"]) != 1) and (not is_impossible):
                         raise ValueError(
                             "For training, each question should have exactly 1 answer.")
