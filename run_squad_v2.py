@@ -418,6 +418,7 @@ def main(_):
             print("no_ans", len(no_ans_qids))
 
             def compute_metrics_with_threshold(threshold):
+                nonlocal result_dict
                 result_dict = {}
                 tp = 0
                 tn = 0
