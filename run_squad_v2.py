@@ -426,8 +426,8 @@ def main(_):
                 fn = 0
                 for example_index, example in enumerate(eval_examples):
                     m = np.mean(cls_dict[example_index])
-                    # predict_is_impossible = 1 / (1 + np.exp(-m)) > threshold
-                    predict_is_impossible = m > threshold
+                    predict_is_impossible = 1 / (1 + np.exp(-m)) > threshold
+                    # predict_is_impossible = m > threshold
                     result_dict[example.qas_id] = m
                     if example.is_impossible:
                         if predict_is_impossible:
