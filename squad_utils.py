@@ -1529,7 +1529,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
-                "cls_logits": tf.nn.sigmoid(outputs["cls_logits"])
+                "cls_logits": outputs["cls_logits"]
             }
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
