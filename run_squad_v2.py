@@ -427,6 +427,7 @@ def main(_):
                         fp += 1
                     else:
                         tn += 1
+            print(tp, tn, fp, fn)
             precision = tp / (tp + fp)
             recall = tp / (fn + tp)
             f1 = 2 * tp / (2 * tp + fp + fn)
