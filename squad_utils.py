@@ -1512,7 +1512,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
             seq_length = modeling.get_shape_list(input_ids)[1]
 
-            def focal_loss(pred, y, alpha=0.8, gamma=2):
+            def focal_loss(pred, y, alpha=0.2, gamma=2):
                 pt = tf.nn.sigmoid(pred)
                 y = tf.cast(y, tf.float32)
                 loss = - alpha * (1 - pt) ** gamma * y * tf.log(pt) - \
