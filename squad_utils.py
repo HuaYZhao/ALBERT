@@ -1426,7 +1426,7 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
         assert best_non_null_entry is not None
 
         score_diff = sum(cls_dict[example_index]) / len(cls_dict[example_index])
-        alpha = 0.5
+        alpha = 0.4
         scores_diff_json[example.qas_id] = alpha * score_diff + (1 - alpha) * no_answer_prediction[example.qas_id]
         # predict null answers when null threshold is provided
         if null_score_diff_threshold is None or score_diff < null_score_diff_threshold:
