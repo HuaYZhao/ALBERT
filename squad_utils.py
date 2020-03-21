@@ -1460,7 +1460,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
-    output["all_encoder_layers"] = all_encoder_layers
+    return_dict["all_encoder_layers"] = all_encoder_layers
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
