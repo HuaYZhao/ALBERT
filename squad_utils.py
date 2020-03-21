@@ -1465,6 +1465,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
+    return_dict["p_mask"] = p_mask
 
     # logit of the start position
     with tf.variable_scope("start_logits"):
