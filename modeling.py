@@ -601,8 +601,9 @@ def embedding_postprocessor(input_tensor,
             full_position_embeddings = tf.get_variable(
                 name=position_embedding_name,
                 shape=[max_position_embeddings, width],
-                initializer=create_initializer(initializer_range),
-                dtype=tf.bfloat16)
+                initializer=create_initializer(initializer_range))
+            print(full_position_embeddings.dtype)
+
             # Since the position embedding table is a learned variable, we create it
             # using a (long) sequence length `max_position_embeddings`. The actual
             # sequence length might be shorter than this, for faster training of
