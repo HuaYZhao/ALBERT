@@ -516,7 +516,7 @@ def embedding_lookup(input_ids,
 
     if use_one_hot_embeddings:
         flat_input_ids = tf.reshape(input_ids, [-1])
-        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)
+        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size, dtype=tf.bfloat16)
         output = tf.matmul(one_hot_input_ids, embedding_table)
     else:
         output = tf.nn.embedding_lookup(embedding_table, input_ids)
