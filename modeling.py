@@ -812,14 +812,14 @@ def dot_product_attention(q, k, v, bias, dropout_rate=0.0):
         # `attention_mask` = [B, T]
         from_shape = get_shape_list(q)
         if len(from_shape) == 4:
-            broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], 1], tf.float32)
+            broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], 1], tf.bfloat16)
         elif len(from_shape) == 5:
             # from_shape = [B, N, Block_num, block_size, depth]#
             broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], from_shape[3],
-                                      1], tf.float32)
+                                      1], tf.bfloat16)
 
         bias = tf.matmul(broadcast_ones,
-                         tf.cast(bias, tf.float32), transpose_b=True)
+                         tf.cast(bias, tf.bfloat16), transpose_b=True)
 
         # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
         # masked positions, this operation will create a tensor which is 0.0 for
