@@ -108,6 +108,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
             epsilon1=1e-30,
             epsilon2=1e-3)
     elif optimizer == "sgd":
+        tf.logging.info("using sgd")
         optimizer = tf.train.GradientDescentOptimizer(learning_rate)
     else:
         raise ValueError("Not supported optimizer: ", optimizer)
