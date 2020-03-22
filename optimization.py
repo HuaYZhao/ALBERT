@@ -177,7 +177,6 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
                 initializer=tf.zeros_initializer())
 
             # Standard Adam update.
-            grad = tf.cast(grad, tf.bfloat16)
             next_m = (
                     tf.multiply(self.beta_1, m) + tf.multiply(1.0 - self.beta_1, grad))
             next_v = (
@@ -200,6 +199,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
 
             next_param = param - update_with_lr
 
+            print(param.dtype, next_param.dtype)
             assignments.extend(
                 [param.assign(next_param),
                  m.assign(next_m),

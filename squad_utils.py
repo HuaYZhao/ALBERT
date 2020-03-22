@@ -1613,20 +1613,19 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
-        with tf.tpu.bfloat16_scope():
-            outputs = create_v2_model(
-                albert_config=albert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                segment_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings,
-                features=features,
-                max_seq_length=max_seq_length,
-                start_n_top=start_n_top,
-                end_n_top=end_n_top,
-                dropout_prob=dropout_prob,
-                hub_module=hub_module)
+        outputs = create_v2_model(
+            albert_config=albert_config,
+            is_training=is_training,
+            input_ids=input_ids,
+            input_mask=input_mask,
+            segment_ids=segment_ids,
+            use_one_hot_embeddings=use_one_hot_embeddings,
+            features=features,
+            max_seq_length=max_seq_length,
+            start_n_top=start_n_top,
+            end_n_top=end_n_top,
+            dropout_prob=dropout_prob,
+            hub_module=hub_module)
 
         tvars = tf.trainable_variables()
 
