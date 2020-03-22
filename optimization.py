@@ -110,6 +110,16 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     elif optimizer == "sgd":
         tf.logging.info("using sgd")
         optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    elif optimizer == "adam":
+        tf.logging.info("using official adam")
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=learning_rate,
+            beta1=0.9,
+            beta2=0.999,
+            epsilon=1e-6,
+            use_locking=False,
+            name='Adam')
+
     else:
         raise ValueError("Not supported optimizer: ", optimizer)
 
