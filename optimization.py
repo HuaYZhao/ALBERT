@@ -173,6 +173,9 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         for (grad, param) in grads_and_vars:
             if grad is None or param is None:
                 continue
+            grad = tf.cast(grad, tf.float32)
+            param_fp16 = param
+            param = tf.cast(param, tf.float32)
 
             param_name = self._get_variable_name(param.name)
 
@@ -190,7 +193,6 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
                 initializer=tf.zeros_initializer())
 
             # Standard Adam update.
-            grad = tf.cast(grad, tf.float32)
             next_m = (
                     tf.multiply(self.beta_1, m) + tf.multiply(1.0 - self.beta_1, grad))
             next_v = (
@@ -215,7 +217,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             next_param = tf.cast(next_param, tf.bfloat16)
 
             assignments.extend(
-                [param.assign(next_param),
+                [param_fp16.assign(next_param),
                  m.assign(next_m),
                  v.assign(next_v)])
         return tf.group(*assignments, name=name)
