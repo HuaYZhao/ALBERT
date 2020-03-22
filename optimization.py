@@ -149,8 +149,8 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
 
         self.learning_rate = learning_rate
         self.weight_decay_rate = weight_decay_rate
-        self.beta_1 = beta_1
-        self.beta_2 = beta_2
+        self.beta_1 = tf.to_bfloat16(beta_1)
+        self.beta_2 = tf.to_bfloat16(beta_2)
         self.epsilon = epsilon
         self.exclude_from_weight_decay = exclude_from_weight_decay
 
@@ -177,8 +177,6 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
                 initializer=tf.zeros_initializer())
 
             # Standard Adam update.
-            print(tf.to_bfloat16(self.beta_1).dtype)
-
             next_m = (
                     tf.multiply(self.beta_1, m) + tf.multiply(1.0 - self.beta_1, grad))
             next_v = (
