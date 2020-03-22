@@ -204,6 +204,7 @@ class AlbertModel(object):
                     initializer_range=config.initializer_range,
                     word_embedding_name="word_embeddings",
                     use_one_hot_embeddings=use_one_hot_embeddings)
+                print(self.word_embedding_output.dtype)
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
@@ -602,7 +603,6 @@ def embedding_postprocessor(input_tensor,
                 name=position_embedding_name,
                 shape=[max_position_embeddings, width],
                 initializer=create_initializer(initializer_range))
-            print(full_position_embeddings.dtype)
 
             # Since the position embedding table is a learned variable, we create it
             # using a (long) sequence length `max_position_embeddings`. The actual
@@ -626,8 +626,6 @@ def embedding_postprocessor(input_tensor,
             position_broadcast_shape.extend([seq_length, width])
             position_embeddings = tf.reshape(position_embeddings,
                                              position_broadcast_shape)
-            print(position_embeddings.dtype)
-            print(output.dtype)
             output += position_embeddings
 
     output = layer_norm_and_dropout(output, dropout_prob)
