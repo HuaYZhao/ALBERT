@@ -193,7 +193,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             # with the m/v parameters. This is equivalent to adding the square
             # of the weights to the loss with plain (non-momentum) SGD.
             if self._do_use_weight_decay(param_name):
-                update += self.weight_decay_rate * param
+                update += tf.cast(self.weight_decay_rate, tf.bfloat16) * param
 
             update_with_lr = self.learning_rate * update
 
