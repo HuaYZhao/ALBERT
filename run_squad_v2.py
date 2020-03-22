@@ -230,11 +230,11 @@ def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
             var = load_variable(ckpt_path, var_name)  # 得到上述参数的值
 
             # 除了修改参数名称，还可以修改参数值（var）
-            new_var = var.astype(np.float16) if var.dtype == 'float32' else var
-            fp16_var = tf.Variable(new_var, name=var_name)  # 使用加入前缀的新名称重新构造了参数
+            new_dtype = tf.bfloat16 if var.dtype == 'float32' else var.dtype
+            fp16_var = tf.Variable(var, name=var_name, dtype=new_dtype)  # 使用加入前缀的新名称重新构造了参数
             new_var_list.append(fp16_var)  # 把赋予新名称的参数加入空列表
 
-        print('starting to write new checkpoint !')
+        print('starting to write fp16 checkpoint !')
         saver = tf.train.Saver(var_list=new_var_list)  # 构造一个保存器
         sess.run(tf.global_variables_initializer())  # 初始化一下参数（这一步必做）
         saver.save(sess, checkpoint_path)  # 直接进行保存

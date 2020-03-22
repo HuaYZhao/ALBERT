@@ -199,7 +199,6 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
 
             next_param = param - update_with_lr
 
-            print(param.dtype, next_param.dtype)
             assignments.extend(
                 [param.assign(next_param),
                  m.assign(next_m),
