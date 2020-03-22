@@ -204,7 +204,6 @@ class AlbertModel(object):
                     initializer_range=config.initializer_range,
                     word_embedding_name="word_embeddings",
                     use_one_hot_embeddings=use_one_hot_embeddings)
-                print(self.word_embedding_output.dtype)
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
@@ -513,6 +512,7 @@ def embedding_lookup(input_ids,
         name=word_embedding_name,
         shape=[vocab_size, embedding_size],
         initializer=create_initializer(initializer_range))
+    print(embedding_table.dtype)
 
     if use_one_hot_embeddings:
         flat_input_ids = tf.reshape(input_ids, [-1])
