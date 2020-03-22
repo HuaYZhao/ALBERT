@@ -522,6 +522,7 @@ def embedding_lookup(input_ids,
         output = tf.nn.embedding_lookup(embedding_table, input_ids)
 
     input_shape = get_shape_list(input_ids)
+    print(output.dtype)
 
     output = tf.reshape(output,
                         input_shape[0:-1] + [input_shape[-1] * embedding_size])
