@@ -1683,7 +1683,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adam")
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
