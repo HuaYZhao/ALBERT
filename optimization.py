@@ -148,7 +148,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         super(AdamWeightDecayOptimizer, self).__init__(False, name)
 
         self.learning_rate = tf.cast(learning_rate, tf.bfloat16)
-        self.weight_decay_rate = tf.cast(weight_decay_rate, tf.bfloat16)
+        self.weight_decay_rate = weight_decay_rate
         self.beta_1 = tf.cast(beta_1, tf.bfloat16)
         self.beta_2 = tf.cast(beta_2, tf.bfloat16)
         self.epsilon = tf.cast(epsilon, tf.bfloat16)
