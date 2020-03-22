@@ -1463,7 +1463,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
-    p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
+    p_mask = tf.cast(features["p_mask"], dtype=tf.bfloat16)
 
     # logit of the start position
     with tf.variable_scope("start_logits", dtype=tf.bfloat16):
@@ -1483,7 +1483,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             # ground truth of the start position
             start_positions = tf.reshape(features["start_positions"], [-1])
             start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                     dtype=tf.float32)
+                                     dtype=tf.bfloat16)
             start_features = tf.einsum("lbh,bl->bh", output, start_index)
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
             end_logits = tf.layers.dense(
@@ -1510,7 +1510,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             start_top_log_probs, start_top_index = tf.nn.top_k(
                 start_log_probs, k=start_n_top)
             start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=tf.float32)
+                                     depth=max_seq_length, axis=-1, dtype=tf.bfloat16)
             start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
             end_input = tf.tile(output[:, :, None],
                                 [1, 1, start_n_top, 1])
@@ -1559,7 +1559,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
-                               axis=-1, dtype=tf.float32)
+                               axis=-1, dtype=tf.bfloat16)
         cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
 
         # get the representation of START
@@ -1658,7 +1658,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             def compute_loss(log_probs, positions):
                 one_hot_positions = tf.one_hot(
-                    positions, depth=seq_length, dtype=tf.float32)
+                    positions, depth=seq_length, dtype=tf.bfloat16)
 
                 loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
                 loss = tf.reduce_mean(loss)
@@ -1674,7 +1674,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
             regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+                labels=tf.cast(is_impossible, dtype=tf.bfloat16), logits=cls_logits)
             regression_loss = tf.reduce_mean(regression_loss)
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
