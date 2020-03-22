@@ -1460,13 +1460,14 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
+    output = tf.cast(output, tf.float32)
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
-    p_mask = tf.cast(features["p_mask"], dtype=tf.bfloat16)
+    p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
 
     # logit of the start position
-    with tf.variable_scope("start_logits", dtype=tf.bfloat16):
+    with tf.variable_scope("start_logits", dtype=tf.float32):
         start_logits = tf.layers.dense(
             output,
             1,
@@ -1477,13 +1478,13 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
     # logit of the end position
-    with tf.variable_scope("end_logits", dtype=tf.bfloat16):
+    with tf.variable_scope("end_logits", dtype=tf.float32):
         if is_training:
             # during training, compute the end logits based on the
             # ground truth of the start position
             start_positions = tf.reshape(features["start_positions"], [-1])
             start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                     dtype=tf.bfloat16)
+                                     dtype=tf.float32)
             start_features = tf.einsum("lbh,bl->bh", output, start_index)
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
             end_logits = tf.layers.dense(
@@ -1510,7 +1511,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             start_top_log_probs, start_top_index = tf.nn.top_k(
                 start_log_probs, k=start_n_top)
             start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=tf.bfloat16)
+                                     depth=max_seq_length, axis=-1, dtype=tf.float32)
             start_features = tf.einsum("lbh,bkl->bkh", output, start_index)
             end_input = tf.tile(output[:, :, None],
                                 [1, 1, start_n_top, 1])
@@ -1555,11 +1556,11 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["end_top_index"] = end_top_index
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class", dtype=tf.bfloat16):
+    with tf.variable_scope("answer_class", dtype=tf.float32):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
-                               axis=-1, dtype=tf.bfloat16)
+                               axis=-1, dtype=tf.float32)
         cls_feature = tf.einsum("lbh,bl->bh", output, cls_index)
 
         # get the representation of START
