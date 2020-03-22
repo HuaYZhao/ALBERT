@@ -166,13 +166,13 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             m = tf.get_variable(
                 name=six.ensure_str(param_name) + "/adam_m",
                 shape=param.shape.as_list(),
-                dtype=tf.float32,
+                dtype=tf.bfloat16,
                 trainable=False,
                 initializer=tf.zeros_initializer())
             v = tf.get_variable(
                 name=six.ensure_str(param_name) + "/adam_v",
                 shape=param.shape.as_list(),
-                dtype=tf.float32,
+                dtype=tf.bfloat16,
                 trainable=False,
                 initializer=tf.zeros_initializer())
 
