@@ -147,11 +147,11 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         """Constructs a AdamWeightDecayOptimizer."""
         super(AdamWeightDecayOptimizer, self).__init__(False, name)
 
-        self.learning_rate = tf.cast(learning_rate, tf.bfloat16)
+        self.learning_rate = learning_rate
         self.weight_decay_rate = weight_decay_rate
         self.beta_1 = tf.cast(beta_1, tf.bfloat16)
         self.beta_2 = tf.cast(beta_2, tf.bfloat16)
-        self.epsilon = tf.cast(epsilon, tf.bfloat16)
+        self.epsilon = epsilon
         self.exclude_from_weight_decay = exclude_from_weight_decay
 
     def apply_gradients(self, grads_and_vars, global_step=None, name=None):
@@ -193,7 +193,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             # with the m/v parameters. This is equivalent to adding the square
             # of the weights to the loss with plain (non-momentum) SGD.
             if self._do_use_weight_decay(param_name):
-                update += tf.cast(self.weight_decay_rate, tf.bfloat16) * param
+                update += self.weight_decay_rate * param
 
             update_with_lr = self.learning_rate * update
 

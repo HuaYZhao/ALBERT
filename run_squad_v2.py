@@ -220,9 +220,8 @@ def validate_flags_or_throw(albert_config):
 
 
 def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
-    import numpy as np
     checkpoint_path = os.path.join(os.path.dirname(ckpt_path), 'model_fp16.ckpt-best')  # 构造一下保存路径
-    if tf.gfile.Exists(checkpoint_path):
+    if tf.gfile.Exists(f"{checkpoint_path}.meta"):
         return checkpoint_path
     with tf.Session() as sess:
         new_var_list = []  # 新建一个空列表存储更新后的Variable变量
