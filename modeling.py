@@ -512,7 +512,6 @@ def embedding_lookup(input_ids,
         name=word_embedding_name,
         shape=[vocab_size, embedding_size],
         initializer=create_initializer(initializer_range))
-    print(embedding_table.dtype)
 
     if use_one_hot_embeddings:
         flat_input_ids = tf.reshape(input_ids, [-1])
@@ -522,7 +521,6 @@ def embedding_lookup(input_ids,
         output = tf.nn.embedding_lookup(embedding_table, input_ids)
 
     input_shape = get_shape_list(input_ids)
-    print(output.dtype)
 
     output = tf.reshape(output,
                         input_shape[0:-1] + [input_shape[-1] * embedding_size])
@@ -588,7 +586,7 @@ def embedding_postprocessor(input_tensor,
         # faster for a small vocabulary, unless converting to tflite model.
         if use_one_hot_embeddings:
             flat_token_type_ids = tf.reshape(token_type_ids, [-1])
-            one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size)
+            one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size, dtype=tf.bfloat16)
             token_type_embeddings = tf.matmul(one_hot_ids, token_type_table)
             token_type_embeddings = tf.reshape(token_type_embeddings,
                                                [batch_size, seq_length, width])
