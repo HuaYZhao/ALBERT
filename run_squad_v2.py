@@ -31,6 +31,7 @@ import tokenization
 import six
 import tensorflow.compat.v1 as tf
 
+from tensorflow.contrib.framework import list_variables, load_variable
 from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
 from tensorflow.contrib import tpu as contrib_tpu
 
@@ -225,8 +226,8 @@ def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
         return checkpoint_path
     with tf.Session() as sess:
         new_var_list = []  # 新建一个空列表存储更新后的Variable变量
-        for var_name, _ in tf.contrib.framework.list_variables(ckpt_path):  # 得到checkpoint文件中所有的参数（名字，形状）元组
-            var = tf.contrib.framework.load_variable(ckpt_path, var_name)  # 得到上述参数的值
+        for var_name, _ in list_variables(ckpt_path):  # 得到checkpoint文件中所有的参数（名字，形状）元组
+            var = load_variable(ckpt_path, var_name)  # 得到上述参数的值
 
             # 除了修改参数名称，还可以修改参数值（var）
             new_var = var.astype(np.float16) if var.dtype == 'float32' else var
