@@ -194,7 +194,7 @@ class AlbertModel(object):
             token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
         with tf.variable_scope(scope, default_name="bert", dtype=tf.bfloat16):
-            with tf.variable_scope("embeddings"):
+            with tf.variable_scope("embeddings", dtype=tf.bfloat16):
                 # Perform embedding lookup on the word ids.
                 (self.word_embedding_output,
                  self.output_embedding_table) = embedding_lookup(
@@ -220,7 +220,7 @@ class AlbertModel(object):
                     dropout_prob=config.hidden_dropout_prob,
                     use_one_hot_embeddings=use_one_hot_embeddings)
 
-            with tf.variable_scope("encoder"):
+            with tf.variable_scope("encoder", dtype=tf.bfloat16):
                 # Run the stacked transformer.
                 # `sequence_output` shape = [batch_size, seq_length, hidden_size].
                 self.all_encoder_layers = transformer_model(
@@ -245,7 +245,7 @@ class AlbertModel(object):
             # [batch_size, hidden_size]. This is necessary for segment-level
             # (or segment-pair-level) classification tasks where we need a fixed
             # dimensional representation of the segment.
-            with tf.variable_scope("pooler"):
+            with tf.variable_scope("pooler", dtype=tf.bfloat16):
                 # We "pool" the model by simply taking the hidden state corresponding
                 # to the first token. We assume that this has been pre-trained
                 # first_token_tensor = tf.squeeze(self.sequence_output[:, 0:1, :], axis=1)
