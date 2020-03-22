@@ -81,7 +81,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=4):
     r = reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num)  # [4,4]
     # print("reward_shape:", r.shape)
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num)
-    loss = tf.reduce_mean(-r)
+    loss = tf.reduce_mean(-r) + sample_num
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
