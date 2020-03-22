@@ -147,11 +147,11 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         """Constructs a AdamWeightDecayOptimizer."""
         super(AdamWeightDecayOptimizer, self).__init__(False, name)
 
-        self.learning_rate = learning_rate
-        self.weight_decay_rate = weight_decay_rate
-        self.beta_1 = tf.to_bfloat16(beta_1)
-        self.beta_2 = tf.to_bfloat16(beta_2)
-        self.epsilon = epsilon
+        self.learning_rate = tf.cast(learning_rate, tf.bfloat16)
+        self.weight_decay_rate = tf.cast(weight_decay_rate, tf.bfloat16)
+        self.beta_1 = tf.cast(beta_1, tf.bfloat16)
+        self.beta_2 = tf.cast(beta_2, tf.bfloat16)
+        self.epsilon = tf.cast(epsilon, tf.bfloat16)
         self.exclude_from_weight_decay = exclude_from_weight_decay
 
     def apply_gradients(self, grads_and_vars, global_step=None, name=None):
