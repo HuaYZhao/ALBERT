@@ -4,6 +4,7 @@ import os
 from matplotlib import pyplot as plt
 from data.eval import get_raw_scores
 import numpy as np
+import time
 
 prediction_file = './data/predictions.json'
 prediction = json.load(open(prediction_file, 'r', encoding='utf-8'))
@@ -81,6 +82,57 @@ def simple_replace():
     # plt.show()
 
 
+def simple_replace_with_null_odds():
+    y = list(no_answer_prediction.values())
+
+    exact_scores, f1_scores = get_raw_scores(dev, prediction)
+    best_exact = sum(exact_scores.values()) / len(exact_scores)
+    best_f1 = sum(f1_scores.values()) / len(f1_scores)
+    best_threshold = None
+    best_alpha = None
+    best_merge_prediction = None
+
+    def threshold_merge(alpha=0.5, threshold=1.):
+        merge_prediction = deepcopy(prediction)
+        for q_ids in prediction.keys():
+            null = alpha * no_answer_prediction[q_ids] + (1 - alpha) * null_odds[q_ids]
+            if null > threshold:
+                merge_prediction[q_ids] = ''
+        return merge_prediction
+
+    for alpha in np.arange(0., 1., 0.1):
+        for threshold in np.arange(-2., 3., 0.1):
+            merge_prediction = threshold_merge(alpha, threshold)
+            exact_scores, f1_scores = get_raw_scores(dev, merge_prediction)
+            exact = sum(exact_scores.values()) / len(exact_scores)
+            f1 = sum(f1_scores.values()) / len(f1_scores)
+            print(alpha, threshold, exact, f1, (exact + f1) / 2)
+            if exact + f1 > best_exact + best_f1:
+                best_exact = exact
+                best_f1 = f1
+                best_alpha = alpha
+                best_threshold = threshold
+                best_merge_prediction = deepcopy(merge_prediction)
+
+    for alpha in np.arange(best_alpha - 0.1, best_alpha + 0.1, 0.01):
+        for threshold in np.arange(best_threshold - 0.3, best_threshold + 0.3, 0.01):
+            merge_prediction = threshold_merge(alpha, threshold)
+            exact_scores, f1_scores = get_raw_scores(dev, merge_prediction)
+            exact = sum(exact_scores.values()) / len(exact_scores)
+            f1 = sum(f1_scores.values()) / len(f1_scores)
+            print(alpha, threshold, exact, f1, (exact + f1) / 2)
+            if exact + f1 > best_exact + best_f1:
+                best_exact = exact
+                best_f1 = f1
+                best_alpha = alpha
+                best_threshold = threshold
+                best_merge_prediction = deepcopy(merge_prediction)
+
+    json.dump(best_merge_prediction, open(merge_prediction_file, 'w', encoding='utf-8'), indent=4)
+    print(f"best_alpha: {best_alpha}"
+          f"best_threshold: {best_threshold}")
+
+
 def prob_statistic_with_nbest():
     y = list(no_answer_prediction.values())
     exact_scores, f1_scores = get_raw_scores(dev, prediction)
@@ -120,6 +172,8 @@ def prob_statistic_with_nbest():
 xargs = "python ./data/eval.py ./data/dev-v2.0.json ./data/predictions.json"
 os.system(xargs)
 
-prob_statistic_with_nbest()
+start = time.time()
+simple_replace_with_null_odds()
 xargs = "python ./data/eval.py ./data/dev-v2.0.json ./data/merge_predictions.json"
 os.system(xargs)
+print(f"cost time: {time.time() - start}")
