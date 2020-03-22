@@ -1590,6 +1590,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
         return_dict["cls_logits"] = cls_logits
 
+    for k, v in return_dict.items():
+        return_dict[k] = tf.cast(v, tf.float32)
     return return_dict
 
 
@@ -1658,7 +1660,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             def compute_loss(log_probs, positions):
                 one_hot_positions = tf.one_hot(
-                    positions, depth=seq_length, dtype=tf.bfloat16)
+                    positions, depth=seq_length, dtype=tf.float32)
 
                 loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
                 loss = tf.reduce_mean(loss)
@@ -1674,7 +1676,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
             regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=tf.cast(is_impossible, dtype=tf.bfloat16), logits=cls_logits)
+                labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
             regression_loss = tf.reduce_mean(regression_loss)
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
@@ -1685,7 +1687,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=tf.cast(total_loss, tf.float32),
+                loss=total_loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
