@@ -129,6 +129,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     tvars = tf.trainable_variables()
     grads = tf.gradients(
         loss, tvars, colocate_gradients_with_ops=colocate_gradients_with_ops)
+    grads = [tf.cast(g, tf.float32) for g in grads]
 
     # This is how the model was pre-trained.
     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
@@ -173,7 +174,6 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         for (grad, param) in grads_and_vars:
             if grad is None or param is None:
                 continue
-            grad = tf.cast(grad, tf.float32)
             param_fp16 = param
             param = tf.cast(param, tf.float32)
 
