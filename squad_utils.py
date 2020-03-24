@@ -1446,7 +1446,7 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
 def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     segment_ids, use_one_hot_embeddings, features,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
-                    hub_module,embedded_inputs=None):
+                    hub_module, embedded_inputs=None):
     """Creates a classification model."""
     (_, output) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
@@ -1457,7 +1457,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=True,
         hub_module=hub_module,
-    embedded_inputs=embedded_inputs)
+        embedded_inputs=embedded_inputs)
 
     bsz = tf.shape(output)[0]
     return_dict = {}
