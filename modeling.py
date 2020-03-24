@@ -193,8 +193,8 @@ class AlbertModel(object):
         if token_type_ids is None:
             token_type_ids = tf.zeros(shape=[batch_size, seq_length], dtype=tf.int32)
 
-        with tf.variable_scope(scope, default_name="bert", dtype=tf.bfloat16):
-            with tf.variable_scope("embeddings", dtype=tf.bfloat16):
+        with tf.variable_scope(scope, default_name="bert", dtype=tf.float16):
+            with tf.variable_scope("embeddings", dtype=tf.float16):
                 # Perform embedding lookup on the word ids.
                 (self.word_embedding_output,
                  self.output_embedding_table) = embedding_lookup(
@@ -220,7 +220,7 @@ class AlbertModel(object):
                     dropout_prob=config.hidden_dropout_prob,
                     use_one_hot_embeddings=use_one_hot_embeddings)
 
-            with tf.variable_scope("encoder", dtype=tf.bfloat16):
+            with tf.variable_scope("encoder", dtype=tf.float16):
                 # Run the stacked transformer.
                 # `sequence_output` shape = [batch_size, seq_length, hidden_size].
                 self.all_encoder_layers = transformer_model(
@@ -245,7 +245,7 @@ class AlbertModel(object):
             # [batch_size, hidden_size]. This is necessary for segment-level
             # (or segment-pair-level) classification tasks where we need a fixed
             # dimensional representation of the segment.
-            with tf.variable_scope("pooler", dtype=tf.bfloat16):
+            with tf.variable_scope("pooler", dtype=tf.float16):
                 # We "pool" the model by simply taking the hidden state corresponding
                 # to the first token. We assume that this has been pre-trained
                 # first_token_tensor = tf.squeeze(self.sequence_output[:, 0:1, :], axis=1)
@@ -515,7 +515,7 @@ def embedding_lookup(input_ids,
 
     if use_one_hot_embeddings:
         flat_input_ids = tf.reshape(input_ids, [-1])
-        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size, dtype=tf.bfloat16)
+        one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size, dtype=tf.float16)
         output = tf.matmul(one_hot_input_ids, embedding_table)
     else:
         output = tf.nn.embedding_lookup(embedding_table, input_ids)
@@ -586,7 +586,7 @@ def embedding_postprocessor(input_tensor,
         # faster for a small vocabulary, unless converting to tflite model.
         if use_one_hot_embeddings:
             flat_token_type_ids = tf.reshape(token_type_ids, [-1])
-            one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size, dtype=tf.bfloat16)
+            one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size, dtype=tf.float16)
             token_type_embeddings = tf.matmul(one_hot_ids, token_type_table)
             token_type_embeddings = tf.reshape(token_type_embeddings,
                                                [batch_size, seq_length, width])
@@ -812,14 +812,14 @@ def dot_product_attention(q, k, v, bias, dropout_rate=0.0):
         # `attention_mask` = [B, T]
         from_shape = get_shape_list(q)
         if len(from_shape) == 4:
-            broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], 1], tf.bfloat16)
+            broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], 1], tf.float16)
         elif len(from_shape) == 5:
             # from_shape = [B, N, Block_num, block_size, depth]#
             broadcast_ones = tf.ones([from_shape[0], 1, from_shape[2], from_shape[3],
-                                      1], tf.bfloat16)
+                                      1], tf.float16)
 
         bias = tf.matmul(broadcast_ones,
-                         tf.cast(bias, tf.bfloat16), transpose_b=True)
+                         tf.cast(bias, tf.float16), transpose_b=True)
 
         # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
         # masked positions, this operation will create a tensor which is 0.0 for

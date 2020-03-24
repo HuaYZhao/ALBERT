@@ -131,7 +131,7 @@ class AdafactorOptimizer(tf.train.Optimizer):
           simulated_quantize_bits: train with simulated quantized parameters
             (experimental)
           parameter_encoding: a ParameterEncoding object to use in the case of
-            bfloat16 variables.
+            float16 variables.
           use_locking: If True use locks for update operations.
           name: Optional name for the operations created when applying gradients.
             Defaults to "AdafactorOptimizer".
@@ -220,7 +220,7 @@ class AdafactorOptimizer(tf.train.Optimizer):
         decay_rate = self._decay_rate
         update_scale = self._learning_rate
         old_val = var
-        if var.dtype.base_dtype == tf.bfloat16:
+        if var.dtype.base_dtype == tf.float16:
             old_val = tf.to_float(self._parameter_encoding.decode(old_val))
         if self._multiply_by_parameter_scale:
             update_scale *= tf.to_float(self._parameter_scale(old_val))
@@ -265,7 +265,7 @@ class AdafactorOptimizer(tf.train.Optimizer):
             new_m = common_layers.cast_like(new_m, var)
             updates.append(tf.assign(m, new_m, use_locking=self._use_locking))
         new_val = tf.to_float(old_val) - subtrahend
-        if var.dtype.base_dtype == tf.bfloat16:
+        if var.dtype.base_dtype == tf.float16:
             new_val = self._parameter_encoding.encode(
                 new_val, self._quantization_noise)
         if self._simulated_quantize_bits:
@@ -334,7 +334,7 @@ def adafactor_optimizer_from_hparams(hparams, lr):
             hparams.optimizer_adafactor_memory_exponent)
     else:
         raise ValueError("unknown optimizer_adafactor_decay_type")
-    if hparams.weight_dtype == "bfloat16":
+    if hparams.weight_dtype == "float16":
         parameter_encoding = quantization.EighthPowerEncoding()
     else:
         parameter_encoding = None

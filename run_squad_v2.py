@@ -114,7 +114,7 @@ flags.DEFINE_integer(
 
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
 
-flags.DEFINE_bool("fp16", True, "Whether to use bfloat16.")
+flags.DEFINE_bool("fp16", True, "Whether to use float16.")
 
 flags.DEFINE_bool("do_predict", False, "Whether to run eval on the dev set.")
 
@@ -219,7 +219,7 @@ def validate_flags_or_throw(albert_config):
             "(%d) + 3" % (FLAGS.max_seq_length, FLAGS.max_query_length))
 
 
-def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
+def cast_ckpt_vars_from_float32_to_float16(ckpt_path):
     checkpoint_path = os.path.join(os.path.dirname(ckpt_path), 'model_fp16.ckpt-best')  # 构造一下保存路径
     if tf.gfile.Exists(f"{checkpoint_path}.meta"):
         return checkpoint_path
@@ -229,7 +229,7 @@ def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
             var = load_variable(ckpt_path, var_name)  # 得到上述参数的值
 
             # 除了修改参数名称，还可以修改参数值（var）
-            new_dtype = tf.bfloat16 if var.dtype == 'float32' else var.dtype
+            new_dtype = tf.float16 if var.dtype == 'float32' else var.dtype
             fp16_var = tf.Variable(var, name=var_name, dtype=new_dtype)  # 使用加入前缀的新名称重新构造了参数
             new_var_list.append(fp16_var)  # 把赋予新名称的参数加入空列表
 
@@ -295,7 +295,7 @@ def main(_):
         rng.shuffle(train_examples)
 
     if FLAGS.fp16:
-        FLAGS.init_checkpoint = cast_ckpt_vars_from_float32_to_bfloat16(FLAGS.init_checkpoint)
+        FLAGS.init_checkpoint = cast_ckpt_vars_from_float32_to_float16(FLAGS.init_checkpoint)
 
     model_fn = squad_utils.v2_model_fn_builder(
         albert_config=albert_config,

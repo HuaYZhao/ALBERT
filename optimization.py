@@ -214,7 +214,7 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             update_with_lr = self.learning_rate * update
 
             next_param = param - update_with_lr
-            next_param = tf.cast(next_param, tf.bfloat16)
+            next_param = tf.cast(next_param, tf.float16)
 
             assignments.extend(
                 [param_fp16.assign(next_param),
