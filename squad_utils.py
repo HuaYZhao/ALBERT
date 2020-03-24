@@ -1448,7 +1448,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
                     max_seq_length, start_n_top, end_n_top, dropout_prob,
                     hub_module, embedded_inputs=None):
     """Creates a classification model."""
-    (_, output) = fine_tuning_utils.create_albert(
+    (_, output, word_embedding_output) = fine_tuning_utils.create_albert(
         albert_config=albert_config,
         is_training=is_training,
         input_ids=input_ids,
@@ -1461,6 +1461,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
+    return_dict["word_embedding_output"] = word_embedding_output
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)

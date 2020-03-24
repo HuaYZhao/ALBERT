@@ -56,7 +56,7 @@ def _create_model_from_scratch(albert_config, is_training, input_ids,
         use_one_hot_embeddings=use_one_hot_embeddings,
         use_einsum=use_einsum,
         embedded_inputs=embedded_inputs)
-    return (model.get_pooled_output(), model.get_sequence_output())
+    return (model.get_pooled_output(), model.get_sequence_output(), model.get_word_embedding_output())
 
 
 def create_albert(albert_config, is_training, input_ids, input_mask,
