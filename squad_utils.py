@@ -1467,7 +1467,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     p_mask = tf.cast(features["p_mask"], dtype=tf.bfloat16)
 
     # logit of the start position
-    with tf.variable_scope("start_logits", dtype=tf.bfloat16):
+    with tf.variable_scope("start_logits", dtype=tf.bfloat16, reuse=tf.AUTO_REUSE):
         start_logits = tf.layers.dense(
             output,
             1,
@@ -1478,7 +1478,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
     # logit of the end position
-    with tf.variable_scope("end_logits", dtype=tf.bfloat16):
+    with tf.variable_scope("end_logits", dtype=tf.bfloat16, reuse=tf.AUTO_REUSE):
         if is_training:
             # during training, compute the end logits based on the
             # ground truth of the start position
@@ -1556,7 +1556,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
         return_dict["end_top_index"] = end_top_index
 
     # an additional layer to predict answerability
-    with tf.variable_scope("answer_class", dtype=tf.bfloat16):
+    with tf.variable_scope("answer_class", dtype=tf.bfloat16, reuse=tf.AUTO_REUSE):
         # get the representation of CLS
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
