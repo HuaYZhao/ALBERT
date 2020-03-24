@@ -31,7 +31,7 @@ import tokenization
 import six
 import tensorflow.compat.v1 as tf
 
-from tensorflow.distribute.cluster_resolver import TPUClusterResolver
+from tensorflow import distribute
 
 # pylint: disable=g-import-not-at-top
 if six.PY2:
@@ -232,7 +232,7 @@ def main(_):
 
     tpu_cluster_resolver = None
     if FLAGS.use_tpu and FLAGS.tpu_name:
-        tpu_cluster_resolver = TPUClusterResolver(
+        tpu_cluster_resolver = distribute.cluster_resolver.TPUClusterResolver(
             FLAGS.tpu_name, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
 
     is_per_host = tf.estimator.tpu.InputPipelineConfig.PER_HOST_V2
