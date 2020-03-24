@@ -1461,7 +1461,6 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
-    return_dict["word_embedding_output"] = word_embedding_output
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
@@ -1594,6 +1593,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     for k, v in return_dict.items():
         return_dict[k] = tf.cast(v, tf.float32)
+    return_dict["word_embedding_output"] = word_embedding_output
     return return_dict
 
 
