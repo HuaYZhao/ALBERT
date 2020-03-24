@@ -31,8 +31,7 @@ import tokenization
 import six
 import tensorflow.compat.v1 as tf
 
-from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
-from tensorflow.contrib import tpu as contrib_tpu
+from tensorflow.distribute.cluster_resolver import TPUClusterResolver
 
 # pylint: disable=g-import-not-at-top
 if six.PY2:
@@ -233,22 +232,22 @@ def main(_):
 
     tpu_cluster_resolver = None
     if FLAGS.use_tpu and FLAGS.tpu_name:
-        tpu_cluster_resolver = contrib_cluster_resolver.TPUClusterResolver(
+        tpu_cluster_resolver = TPUClusterResolver(
             FLAGS.tpu_name, zone=FLAGS.tpu_zone, project=FLAGS.gcp_project)
 
-    is_per_host = contrib_tpu.InputPipelineConfig.PER_HOST_V2
+    is_per_host = tf.estimator.tpu.InputPipelineConfig.PER_HOST_V2
     if FLAGS.do_train:
         iterations_per_loop = int(min(FLAGS.iterations_per_loop,
                                       FLAGS.save_checkpoints_steps))
     else:
         iterations_per_loop = FLAGS.iterations_per_loop
-    run_config = contrib_tpu.RunConfig(
+    run_config = tf.estimator.tpu.RunConfig(
         cluster=tpu_cluster_resolver,
         master=FLAGS.master,
         model_dir=FLAGS.output_dir,
         keep_checkpoint_max=0,
         save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        tpu_config=contrib_tpu.TPUConfig(
+        tpu_config=tf.estimator.tpu.TPUConfig(
             iterations_per_loop=iterations_per_loop,
             num_shards=FLAGS.num_tpu_cores,
             per_host_input_for_training=is_per_host))
@@ -284,7 +283,7 @@ def main(_):
 
     # If TPU is not available, this will fall back to normal Estimator on CPU
     # or GPU.
-    estimator = contrib_tpu.TPUEstimator(
+    estimator = tf.estimator.tpu.TPUEstimator(
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
         config=run_config,
