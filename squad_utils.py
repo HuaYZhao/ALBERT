@@ -1579,6 +1579,7 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
             kernel_initializer=modeling.create_initializer(
                 albert_config.initializer_range),
             name="dense_0")
+        print('x.dtype: %s' % ans_feature.dtype.name)
         ans_feature = tf.layers.dropout(ans_feature, dropout_prob,
                                         training=is_training)
         cls_logits = tf.layers.dense(
