@@ -33,7 +33,8 @@ import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow as tf
+import tensorflow as tf2
+import tensorflow.compat.v1 as tf
 from tensorflow.compat.v1.data.experimental import map_and_batch
 import contrib_helper
 
@@ -134,7 +135,7 @@ class InputFeatures(object):
 
 def read_squad_examples(input_file, is_training):
     """Read a SQuAD json file into a list of SquadExample."""
-    with tf.io.gfile.GFile(input_file, "r") as reader:
+    with tf.gfile.Open(input_file, "r") as reader:
         input_data = json.load(reader)["data"]
 
     examples = []
@@ -653,30 +654,30 @@ def input_fn_builder(input_file, seq_length, is_training,
     """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
     name_to_features = {
-        "unique_ids": tf.io.FixedLenFeature([], tf.int64),
-        "input_ids": tf.io.FixedLenFeature([seq_length], tf.int64),
-        "input_mask": tf.io.FixedLenFeature([seq_length], tf.int64),
-        "segment_ids": tf.io.FixedLenFeature([seq_length], tf.int64),
+        "unique_ids": tf2.io.FixedLenFeature([], tf.int64),
+        "input_ids": tf2.io.FixedLenFeature([seq_length], tf.int64),
+        "input_mask": tf2.io.FixedLenFeature([seq_length], tf.int64),
+        "segment_ids": tf2.io.FixedLenFeature([seq_length], tf.int64),
     }
     # p_mask is not required for SQuAD v1.1
     if is_v2:
-        name_to_features["p_mask"] = tf.io.FixedLenFeature([seq_length], tf.int64)
+        name_to_features["p_mask"] = tf2.io.FixedLenFeature([seq_length], tf.int64)
 
     if is_training:
-        name_to_features["start_positions"] = tf.io.FixedLenFeature([], tf.int64)
-        name_to_features["end_positions"] = tf.io.FixedLenFeature([], tf.int64)
-        name_to_features["is_impossible"] = tf.io.FixedLenFeature([], tf.int64)
+        name_to_features["start_positions"] = tf2.io.FixedLenFeature([], tf.int64)
+        name_to_features["end_positions"] = tf2.io.FixedLenFeature([], tf.int64)
+        name_to_features["is_impossible"] = tf2.io.FixedLenFeature([], tf.int64)
 
     def _decode_record(record, name_to_features):
         """Decodes a record to a TensorFlow example."""
-        example = tf.io.parse_single_example(record, name_to_features)
+        example = tf2.io.parse_single_example(record, name_to_features)
 
         # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
         # So cast all int64 to int32.
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
-                t = tf.compat.v1.to_int32(t)
+                t = tf.to_int32(t)
             example[name] = t
 
         return example
@@ -690,7 +691,7 @@ def input_fn_builder(input_file, seq_length, is_training,
 
         # For training, we want a lot of parallel reading and shuffling.
         # For eval, we want no shuffling and parallel reading doesn't matter.
-        d = tf.data.TFRecordDataset(input_file)
+        d = tf2.data.TFRecordDataset(input_file)
         if is_training:
             d = d.repeat()
             d = d.shuffle(buffer_size=1000)
@@ -834,7 +835,7 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-            output_spec = tf.estimator.tpu.TPUEstimatorSpec(
+            output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
                 train_op=train_op,
@@ -846,7 +847,7 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             }
             if unique_ids is not None:
                 predictions["unique_ids"] = unique_ids
-            output_spec = tf.estimator.tpu.TPUEstimatorSpec(
+            output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         else:
             raise ValueError(
@@ -1022,10 +1023,10 @@ def write_predictions_v1(result_dict, all_examples, all_features,
         all_predictions[example.qas_id] = nbest_json[0]["text"]
         all_nbest_json[example.qas_id] = nbest_json
 
-    with tf.io.gfile.GFile(output_prediction_file, "w") as writer:
+    with tf.gfile.GFile(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
 
-    with tf.io.gfile.GFile(output_nbest_file, "w") as writer:
+    with tf.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
 
     return all_predictions
@@ -1434,13 +1435,13 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
         all_nbest_json[example.qas_id] = nbest_json
         assert len(nbest_json) >= 1
 
-    with tf.io.gfile.GFile(output_prediction_file, "w") as writer:
+    with tf.gfile.GFile(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
 
-    with tf.io.gfile.GFile(output_nbest_file, "w") as writer:
+    with tf.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
 
-    with tf.io.gfile.GFile(output_null_log_odds_file, "w") as writer:
+    with tf.gfile.GFile(output_null_log_odds_file, "w") as writer:
         writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
     return all_predictions, scores_diff_json
 
