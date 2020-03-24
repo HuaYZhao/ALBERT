@@ -134,7 +134,7 @@ class InputFeatures(object):
 
 def read_squad_examples(input_file, is_training):
     """Read a SQuAD json file into a list of SquadExample."""
-    with tf.gfile.Open(input_file, "r") as reader:
+    with tf.io.gfile.GFile(input_file, "r") as reader:
         input_data = json.load(reader)["data"]
 
     examples = []
@@ -834,7 +834,7 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
-            output_spec = contrib_tpu.TPUEstimatorSpec(
+            output_spec = tf.estimator.tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
                 train_op=train_op,
@@ -846,7 +846,7 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             }
             if unique_ids is not None:
                 predictions["unique_ids"] = unique_ids
-            output_spec = contrib_tpu.TPUEstimatorSpec(
+            output_spec = tf.estimator.tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         else:
             raise ValueError(
@@ -1022,10 +1022,10 @@ def write_predictions_v1(result_dict, all_examples, all_features,
         all_predictions[example.qas_id] = nbest_json[0]["text"]
         all_nbest_json[example.qas_id] = nbest_json
 
-    with tf.gfile.GFile(output_prediction_file, "w") as writer:
+    with tf.io.gfile.GFile(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
 
-    with tf.gfile.GFile(output_nbest_file, "w") as writer:
+    with tf.io.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
 
     return all_predictions
@@ -1434,13 +1434,13 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
         all_nbest_json[example.qas_id] = nbest_json
         assert len(nbest_json) >= 1
 
-    with tf.gfile.GFile(output_prediction_file, "w") as writer:
+    with tf.io.gfile.GFile(output_prediction_file, "w") as writer:
         writer.write(json.dumps(all_predictions, indent=4) + "\n")
 
-    with tf.gfile.GFile(output_nbest_file, "w") as writer:
+    with tf.io.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
 
-    with tf.gfile.GFile(output_null_log_odds_file, "w") as writer:
+    with tf.io.gfile.GFile(output_null_log_odds_file, "w") as writer:
         writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
     return all_predictions, scores_diff_json
 
