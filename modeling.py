@@ -158,7 +158,8 @@ class AlbertModel(object):
                  token_type_ids=None,
                  use_one_hot_embeddings=False,
                  use_einsum=True,
-                 scope=None):
+                 scope=None,
+                 embedded_inputs=None):
         """Constructor for AlbertModel.
 
         Args:
@@ -204,6 +205,8 @@ class AlbertModel(object):
                     initializer_range=config.initializer_range,
                     word_embedding_name="word_embeddings",
                     use_one_hot_embeddings=use_one_hot_embeddings)
+                if embedded_inputs is not None:
+                    self.word_embedding_output += embedded_inputs
 
                 # Add positional embeddings and token type embeddings, then layer
                 # normalize and perform dropout.
