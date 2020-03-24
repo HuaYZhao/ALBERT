@@ -676,7 +676,7 @@ def input_fn_builder(input_file, seq_length, is_training,
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
-                t = tf.to_int32(t)
+                t = tf.compat.v1.to_int32(t)
             example[name] = t
 
         return example
@@ -695,14 +695,14 @@ def input_fn_builder(input_file, seq_length, is_training,
             d = d.repeat()
             d = d.shuffle(buffer_size=1000)
 
-        # d = d.map(map_func=lambda record: _decode_record(record, name_to_features))
-        # d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
+        d = d.map(map_func=lambda record: _decode_record(record, name_to_features))
+        d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
 
-        d = d.apply(
-            map_and_batch(
-                lambda record: _decode_record(record, name_to_features),
-                batch_size=batch_size,
-                drop_remainder=drop_remainder))
+        # d = d.apply(
+        #     map_and_batch(
+        #         lambda record: _decode_record(record, name_to_features),
+        #         batch_size=batch_size,
+        #         drop_remainder=drop_remainder))
 
         return d
 
