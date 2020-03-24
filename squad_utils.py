@@ -33,7 +33,7 @@ import numpy as np
 import six
 from six.moves import map
 from six.moves import range
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from tensorflow.compat.v1.data.experimental import map_and_batch
 import contrib_helper
 
