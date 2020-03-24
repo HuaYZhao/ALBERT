@@ -698,11 +698,11 @@ def input_fn_builder(input_file, seq_length, is_training,
         # d = d.map(map_func=lambda record: _decode_record(record, name_to_features))
         # d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
 
-        d = d.apply(
-            map_and_batch(
-                lambda record: _decode_record(record, name_to_features),
-                batch_size=batch_size,
-                drop_remainder=drop_remainder))
+        # d = d.apply(
+        #     map_and_batch(
+        #         lambda record: _decode_record(record, name_to_features),
+        #         batch_size=batch_size,
+        #         drop_remainder=drop_remainder))
 
         return d
 
