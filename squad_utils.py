@@ -36,6 +36,7 @@ from six.moves import range
 import tensorflow.compat.v1 as tf
 import contrib_helper
 
+
 _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
     "PrelimPrediction",
     ["feature_index", "start_index", "end_index",

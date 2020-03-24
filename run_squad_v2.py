@@ -32,6 +32,7 @@ import six
 import tensorflow.compat.v1 as tf
 
 from tensorflow import distribute
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 # pylint: disable=g-import-not-at-top
 if six.PY2:
@@ -218,6 +219,12 @@ def validate_flags_or_throw(albert_config):
 def main(_):
     tf.disable_eager_execution()
     tf.logging.set_verbosity(tf.logging.INFO)
+
+    policy = mixed_precision.Policy('mixed_bfloat16')
+    mixed_precision.set_policy(policy)
+
+    print('Compute dtype: %s' % policy.compute_dtype)
+    print('Variable dtype: %s' % policy.variable_dtype)
 
     albert_config = modeling.AlbertConfig.from_json_file(FLAGS.albert_config_file)
 
