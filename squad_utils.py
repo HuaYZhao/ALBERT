@@ -1602,11 +1602,11 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
                         end_n_top, dropout_prob, hub_module):
 
-    policy = mixed_precision.Policy('mixed_bfloat16')
-    mixed_precision.set_policy(policy)
-
-    print('Compute dtype: %s' % policy.compute_dtype)
-    print('Variable dtype: %s' % policy.variable_dtype)
+    # policy = mixed_precision.Policy('mixed_bfloat16')
+    # mixed_precision.set_policy(policy)
+    #
+    # print('Compute dtype: %s' % policy.compute_dtype)
+    # print('Variable dtype: %s' % policy.variable_dtype)
     """Returns `model_fn` closure for TPUEstimator."""
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
