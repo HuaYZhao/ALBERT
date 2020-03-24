@@ -34,6 +34,7 @@ import six
 from six.moves import map
 from six.moves import range
 import tensorflow.compat.v1 as tf
+from tensorflow.compat.v1.data.experimental import map_and_batch
 import contrib_helper
 
 _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
@@ -694,14 +695,14 @@ def input_fn_builder(input_file, seq_length, is_training,
             d = d.repeat()
             d = d.shuffle(buffer_size=1000)
 
-        d = d.map(map_func=lambda record: _decode_record(record, name_to_features))
-        d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
+        # d = d.map(map_func=lambda record: _decode_record(record, name_to_features))
+        # d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
 
-        # d = d.apply(
-        #     contrib_helper.map_and_batch(
-        #         lambda record: _decode_record(record, name_to_features),
-        #         batch_size=batch_size,
-        #         drop_remainder=drop_remainder))
+        d = d.apply(
+            map_and_batch(
+                lambda record: _decode_record(record, name_to_features),
+                batch_size=batch_size,
+                drop_remainder=drop_remainder))
 
         return d
 
@@ -789,18 +790,18 @@ def v1_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         initialized_variable_names = {}
         scaffold_fn = None
-        # if init_checkpoint:
-        #     (assignment_map, initialized_variable_names
-        #      ) = modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
-        #     if use_tpu:
-        #
-        #         def tpu_scaffold():
-        #             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
-        #             return tf.train.Scaffold()
-        #
-        #         scaffold_fn = tpu_scaffold
-        #     else:
-        #         tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+        if init_checkpoint:
+            (assignment_map, initialized_variable_names
+             ) = modeling.get_assignment_map_from_checkpoint(tvars, init_checkpoint)
+            if use_tpu:
+
+                def tpu_scaffold():
+                    tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
+                    return tf.train.Scaffold()
+
+                scaffold_fn = tpu_scaffold
+            else:
+                tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
         tf.logging.info("**** Trainable Variables ****")
         for var in tvars:
