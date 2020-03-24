@@ -78,7 +78,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
         tf.logging.info("using adamw")
         optimizer = AdamWeightDecayOptimizer(
             learning_rate=learning_rate,
-            weight_decay_rate=0.02,
+            weight_decay_rate=0.01,
             beta_1=0.9,
             beta_2=0.999,
             epsilon=1e-6,
