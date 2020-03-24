@@ -695,7 +695,7 @@ def input_fn_builder(input_file, seq_length, is_training,
             d = d.shuffle(buffer_size=1000)
 
         d = d.apply(
-            tf.data.experimental.map_and_batch(
+            contrib_helper.map_and_batch(
                 lambda record: _decode_record(record, name_to_features),
                 batch_size=batch_size,
                 drop_remainder=drop_remainder))
