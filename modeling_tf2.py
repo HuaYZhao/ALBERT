@@ -158,8 +158,8 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         end_n_top = kwargs.get("end_n_top", 5)
 
         input_ids = inputs
-        input_mask = kwargs["input_mask"]
-        segment_ids = kwargs["segment_ids"]
+        input_mask = kwargs.get("input_mask", None)
+        segment_ids = kwargs.get("segment_ids", None)
 
         outputs = self.albert(input_ids,
                               attention_mask=input_mask,
