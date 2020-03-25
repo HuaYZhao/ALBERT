@@ -47,7 +47,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             name="answer_dense_1",
             use_bias=False
         )
-        self.dropout = tf.keras.layers.Dropout(dropout_prob=kwargs.get("dropout_prob", config.classifier_dropout_prob))
+        self.dropout = tf.keras.layers.Dropout(rate=kwargs.get("dropout_prob", config.classifier_dropout_prob))
 
     def forward(self,
                 sequence_output,
