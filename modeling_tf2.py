@@ -57,9 +57,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         input_shape = tf.shape(sequence_output)
         bsz = input_shape[1]
         max_seq_length = input_shape[0]
-        print(input_shape)
-        print(input_shape[0])
-        p_mask = features.get("p_mask", tf.ones([bsz, max_seq_length]))
+        p_mask = tf.cast(features.get("p_mask", tf.ones([bsz, max_seq_length])), tf.float32)
         start_positions = features.get("start_positions", tf.zeros([bsz, max_seq_length]))
         return_dict = {}
 
@@ -176,7 +174,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         input_mask = kwargs.get("input_mask", None)
         segment_ids = kwargs.get("segment_ids", None)
-        print(input_ids)
         outputs = self.albert(input_ids,
                               attention_mask=input_mask,
                               token_type_ids=segment_ids,
@@ -184,7 +181,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               training=mode == "train")
 
         sequence_output = outputs[0]
-        print(sequence_output.shape)
 
         sequence_output = tf.transpose(sequence_output, [1, 0, 2])
 
