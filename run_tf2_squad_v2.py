@@ -335,8 +335,8 @@ def train(
                         # Save model checkpoint
                         output_dir = os.path.join(args["output_dir"], "checkpoint-{}".format(global_step))
 
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
+                        if not tf.io.gfile.exists(output_dir):
+                            tf.io.gfile.makedirs(output_dir)
 
                         model.save_pretrained(output_dir)
                         logging.info("Saving model checkpoint to %s", output_dir)
@@ -515,7 +515,7 @@ def load_and_cache_examples(args, tokenizer, batch_size, mode):
             mode, list(filter(None, args["model_name_or_path"].split("-")))[0], str(args["max_seq_length"])
         ),
     )
-    if os.path.exists(cached_features_file) and not args["overwrite_cache"]:
+    if tf.io.gfile.exists(cached_features_file) and not args["overwrite_cache"]:
         logging.info("Loading features from cached file %s", cached_features_file)
         dataset, size = load_cache(cached_features_file, args["max_seq_length"], mode)
     else:
@@ -550,8 +550,8 @@ def main(_):
     args = flags.FLAGS.flag_values_dict()
 
     if (
-            os.path.exists(args["output_dir"])
-            and os.listdir(args["output_dir"])
+            tf.io.gfile.exists(args["output_dir"])
+            and tf.io.gfile.listdir(args["output_dir"])
             and args["do_train"]
             and not args["overwrite_output_dir"]
     ):
@@ -625,8 +625,8 @@ def main(_):
             train_batch_size,
         )
 
-        if not os.path.exists(args["output_dir"]):
-            os.makedirs(args["output_dir"])
+        if not tf.io.gfile.exists(args["output_dir"]):
+            tf.io.gfile.makedirs(args["output_dir"])
 
         logging.info("Saving model to %s", args["output_dir"])
 
