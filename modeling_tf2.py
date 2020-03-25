@@ -74,6 +74,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
             end_logits = self.end_dense0(tf.concat([sequence_output, start_features], axis=-1))
             tf.keras.layers.LayerNormalization()
+            print(end_logits.shape)
             end_logits = self.LayerNorm(end_logits)
 
             end_logits = self.end_dense1(end_logits)
@@ -88,8 +89,6 @@ class SquadQALayer(tf.keras.layers.Layer):
                 start_log_probs, k=start_n_top)
             start_index = tf.one_hot(start_top_index,
                                      depth=max_seq_length, axis=-1, dtype=tf.float32)
-            print(sequence_output.shape)
-            print(start_index.shape)
             start_features = tf.einsum("lbh,bkl->bkh", sequence_output, start_index)
             end_input = tf.tile(sequence_output[:, :, None],
                                 [1, 1, start_n_top, 1])
@@ -97,7 +96,6 @@ class SquadQALayer(tf.keras.layers.Layer):
                                      [max_seq_length, 1, 1, 1])
             end_input = tf.concat([end_input, start_features], axis=-1)
             end_logits = self.end_dense0(end_input)
-
             end_logits = self.LayerNorm(end_logits)
             end_logits = self.end_dense1(end_logits)
             end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
