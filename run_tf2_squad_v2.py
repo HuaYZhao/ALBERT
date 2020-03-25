@@ -261,7 +261,6 @@ def train(
                 loss = tf.reduce_sum(per_total_loss) * (1.0 / train_batch_size)
 
                 grads = tape.gradient(loss, model.trainable_variables)
-                print(grads[0].device_map)
 
                 gradient_accumulator(grads)
 
