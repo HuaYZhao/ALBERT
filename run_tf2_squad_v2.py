@@ -236,7 +236,7 @@ def train(
 
             with tf.GradientTape() as tape:
                 outputs = model(input_ids, **train_features)
-                print(outputs.keys())
+                print(outputs)
                 print(train_features.keys())
 
                 def compute_loss(log_probs, positions):
