@@ -149,7 +149,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         self.albert = TFAlbertMainLayer(config, name="albert")
 
-        dropout_prob = kwargs.get("dropout_prob", config.hidden_dropout_prob)
+        dropout_prob = kwargs.get("dropout_prob", config.classifier_dropout_prob)
         self.qa_layer = SquadQALayer(config, dropout_prob=dropout_prob, name="qa_layer")
 
     def call(self, inputs, **kwargs):

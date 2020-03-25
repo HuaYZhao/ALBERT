@@ -1,0 +1,23 @@
+export PYTHONPATH=${{PYTHONPATH}}:`pwd`/ALBERT && python -m ALBERT.run_tf2_squad_v2 \
+  --mode_type=albert \
+  --model_name_or_path={} \
+  --data_dir='/content/data/inputs' \
+  --output_dir='/content/data/train' \
+  --spm_model_file={} \
+  --do_lower_case \
+  --max_seq_length {} \
+  --doc_stride={} \
+  --max_query_length={} \
+  --do_train={} \
+  --do_predict={} \
+  --per_device_train_batch_size={} \
+  --per_device_eval_batch_size={} \
+  --learning_rate={} \
+  --num_train_epochs={} \
+  --warmup_proportion={} \
+  --save_checkpoints_steps={} \
+  --n_best_size={} \
+  --max_answer_length={} \
+  --tpu={} \
+  --overwrite_output_dir={} \
+  --fp16={}

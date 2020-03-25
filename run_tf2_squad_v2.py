@@ -115,8 +115,6 @@ flags.DEFINE_float(
     "Proportion of training to perform linear learning rate warmup for. "
     "E.g., 0.1 = 10% of training.")
 
-flags.DEFINE_float("weight_decay", 0.0, "Weight decay if we apply some.")
-
 flags.DEFINE_integer(
     "n_best_size", 20,
     "The total number of n-best predictions to generate in the "
