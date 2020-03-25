@@ -257,12 +257,11 @@ def train(
                     labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
 
                 per_total_loss = total_loss + 0.5 * regression_loss
-                print("loss shape", per_total_loss.shape)
 
                 loss = tf.reduce_sum(per_total_loss) * (1.0 / train_batch_size)
 
                 grads = tape.gradient(loss, model.trainable_variables)
-                print(grads)
+                print(grads[0].device_map)
 
                 gradient_accumulator(grads)
 
