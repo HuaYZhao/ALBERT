@@ -151,12 +151,11 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         self.qa_layer = SquadQALayer(config, name="qa_layer")
 
-    def call(self, inputs, **kwargs):
+    def call(self, input_ids, **kwargs):
         mode = kwargs.get("mode", "predict")
         start_n_top = kwargs.get("start_n_top", 5)
         end_n_top = kwargs.get("end_n_top", 5)
 
-        input_ids = inputs
         input_mask = kwargs.get("input_mask", None)
         segment_ids = kwargs.get("segment_ids", None)
 

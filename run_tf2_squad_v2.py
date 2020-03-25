@@ -228,14 +228,14 @@ def train(
     @tf.function
     def train_step(train_features):
         def step_fn(train_features):
-            seq_length = tf.shape(train_features["input_ids"])[1]
+            input_ids = train_features.pop("input_ids")
+            seq_length = tf.shape(input_ids)[1]
+            train_features["start_n_top"] = args["start_n_top"]
+            train_features["end_n_top"] = args["end_n_top"]
+            train_features["mode"] = mode
 
             with tf.GradientTape() as tape:
-                outputs = model(train_features.pop("input_ids"),
-                                start_n_top=args["start_n_top"],
-                                end_n_top=args["end_n_top"],
-                                mode="train",
-                                **train_features)
+                outputs = model(input_ids, **train_features)
 
                 def compute_loss(log_probs, positions):
                     one_hot_positions = tf.one_hot(
@@ -351,60 +351,86 @@ def train(
     logging.info("  Training took time = {}".format(datetime.datetime.now() - current_time))
 
 
-def evaluate(args, strategy, model, tokenizer, labels, pad_token_label_id, mode):
-    eval_batch_size = args["per_device_eval_batch_size"] * args["n_device"]
-    eval_dataset, size = load_and_cache_examples(
-        args, tokenizer, labels, pad_token_label_id, eval_batch_size, mode=mode
-    )
-    eval_dataset = strategy.experimental_distribute_dataset(eval_dataset)
-    preds = None
-    num_eval_steps = math.ceil(size / eval_batch_size)
-    master = master_bar(range(1))
-    eval_iterator = progress_bar(eval_dataset, total=num_eval_steps, parent=master, display=args["n_device"] > 1)
-    loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-    loss = 0.0
-
-    logging.info("***** Running evaluation *****")
-    logging.info("  Num examples = %d", size)
-    logging.info("  Batch size = %d", eval_batch_size)
-
-    for eval_features, eval_labels in eval_iterator:
-        inputs = {"attention_mask": eval_features["input_mask"], "training": False}
-
-        if args["model_type"] != "distilbert":
-            inputs["token_type_ids"] = (
-                eval_features["segment_ids"] if args["model_type"] in ["bert", "xlnet"] else None
-            )
-
-        with strategy.scope():
-            logits = model(eval_features["input_ids"], **inputs)[0]
-            tmp_logits = tf.reshape(logits, (-1, len(labels) + 1))
-            active_loss = tf.reshape(eval_features["input_mask"], (-1,))
-            active_logits = tf.boolean_mask(tmp_logits, active_loss)
-            tmp_eval_labels = tf.reshape(eval_labels, (-1,))
-            active_labels = tf.boolean_mask(tmp_eval_labels, active_loss)
-            cross_entropy = loss_fct(active_labels, active_logits)
-            loss += tf.reduce_sum(cross_entropy) * (1.0 / eval_batch_size)
-
-        if preds is None:
-            preds = logits.numpy()
-            label_ids = eval_labels.numpy()
-        else:
-            preds = np.append(preds, logits.numpy(), axis=0)
-            label_ids = np.append(label_ids, eval_labels.numpy(), axis=0)
-
-    preds = np.argmax(preds, axis=2)
-    y_pred = [[] for _ in range(label_ids.shape[0])]
-    y_true = [[] for _ in range(label_ids.shape[0])]
-    loss = loss / num_eval_steps
-
-    for i in range(label_ids.shape[0]):
-        for j in range(label_ids.shape[1]):
-            if label_ids[i, j] != pad_token_label_id:
-                y_pred[i].append(labels[preds[i, j] - 1])
-                y_true[i].append(labels[label_ids[i, j] - 1])
-
-    return y_true, y_pred, loss.numpy()
+# def evaluate(args, strategy, model, tokenizer, mode):
+#     eval_batch_size = args["per_device_eval_batch_size"] * args["n_device"]
+#     eval_dataset, size = load_and_cache_examples(
+#         args, tokenizer, eval_batch_size, mode=mode
+#     )
+#     eval_dataset = strategy.experimental_distribute_dataset(eval_dataset)
+#     preds = None
+#     num_eval_steps = math.ceil(size / eval_batch_size)
+#     master = master_bar(range(1))
+#     eval_iterator = progress_bar(eval_dataset, total=num_eval_steps, parent=master, display=args["n_device"] > 1)
+#
+#     logging.info("***** Running evaluation *****")
+#     logging.info("  Num examples = %d", size)
+#     logging.info("  Batch size = %d", eval_batch_size)
+#
+#     all_results = []
+#     for eval_features in eval_iterator:
+#         input_ids = eval_features.pop("input_ids")
+#         seq_length = tf.shape(input_ids)[1]
+#         eval_features["start_n_top"] = args["start_n_top"]
+#         eval_features["end_n_top"] = args["end_n_top"]
+#         eval_features["mode"] = mode
+#
+#         with strategy.scope():
+#             outputs = model(input_ids, **eval_features)
+#             if len(all_results) % 1000 == 0:
+#                 logging.info("Processing example: %d" % (len(all_results)))
+#             for idx in range(eval_batch_size):
+#                 unique_id = int(eval_features["unique_ids"][idx])
+#                 start_top_log_probs = (
+#                     [float(x) for x in outputs["start_top_log_probs"]])
+#             start_top_index = [int(x) for x in result["start_top_index"].flat]
+#             end_top_log_probs = (
+#                 [float(x) for x in result["end_top_log_probs"].flat])
+#             end_top_index = [int(x) for x in result["end_top_index"].flat]
+#
+#             cls_logits = float(result["cls_logits"].flat[0])
+#             all_results.append(
+#                 squad_utils.RawResultV2(
+#                     unique_id=unique_id,
+#                     start_top_log_probs=start_top_log_probs,
+#                     start_top_index=start_top_index,
+#                     end_top_log_probs=end_top_log_probs,
+#                     end_top_index=end_top_index,
+#                     cls_logits=cls_logits))
+#             predictions = {
+#                 "unique_ids": eval_features["unique_ids"],
+#                 "start_top_index": outputs["start_top_index"],
+#                 "start_top_log_probs": outputs["start_top_log_probs"],
+#                 "end_top_index": outputs["end_top_index"],
+#                 "end_top_log_probs": outputs["end_top_log_probs"],
+#                 "cls_logits": outputs["cls_logits"]
+#             }
+#             tmp_logits = tf.reshape(logits, (-1, len(labels) + 1))
+#             active_loss = tf.reshape(eval_features["input_mask"], (-1,))
+#             active_logits = tf.boolean_mask(tmp_logits, active_loss)
+#             tmp_eval_labels = tf.reshape(eval_labels, (-1,))
+#             active_labels = tf.boolean_mask(tmp_eval_labels, active_loss)
+#             cross_entropy = loss_fct(active_labels, active_logits)
+#             loss += tf.reduce_sum(cross_entropy) * (1.0 / eval_batch_size)
+#
+#         if preds is None:
+#             preds = logits.numpy()
+#             label_ids = eval_labels.numpy()
+#         else:
+#             preds = np.append(preds, logits.numpy(), axis=0)
+#             label_ids = np.append(label_ids, eval_labels.numpy(), axis=0)
+#
+#     preds = np.argmax(preds, axis=2)
+#     y_pred = [[] for _ in range(label_ids.shape[0])]
+#     y_true = [[] for _ in range(label_ids.shape[0])]
+#     loss = loss / num_eval_steps
+#
+#     for i in range(label_ids.shape[0]):
+#         for j in range(label_ids.shape[1]):
+#             if label_ids[i, j] != pad_token_label_id:
+#                 y_pred[i].append(labels[preds[i, j] - 1])
+#                 y_true[i].append(labels[label_ids[i, j] - 1])
+#
+#     return y_true, y_pred, loss.numpy()
 
 
 def load_cache(cached_file, max_seq_length, mode):
@@ -419,9 +445,9 @@ def load_cache(cached_file, max_seq_length, mode):
     }
 
     if is_training:
-        name_to_features["start_positions"] = tf.FixedLenFeature([], tf.int64)
-        name_to_features["end_positions"] = tf.FixedLenFeature([], tf.int64)
-        name_to_features["is_impossible"] = tf.FixedLenFeature([], tf.int64)
+        name_to_features["start_positions"] = tf.io.FixedLenFeature([], tf.int64)
+        name_to_features["end_positions"] = tf.io.FixedLenFeature([], tf.int64)
+        name_to_features["is_impossible"] = tf.io.FixedLenFeature([], tf.int64)
 
     def _decode_record(record):
         """Decodes a record to a TensorFlow example."""
@@ -432,7 +458,7 @@ def load_cache(cached_file, max_seq_length, mode):
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
-                t = tf.to_int32(t)
+                t = tf.compat.v1.to_int32(t)
             example[name] = t
 
         return example
@@ -494,8 +520,9 @@ def load_and_cache_examples(args, tokenizer, batch_size, mode):
         dataset, size = load_cache(cached_features_file, args["max_seq_length"], mode)
     else:
         logging.info("Creating features from dataset file at %s", args["data_dir"])
+        file_name = "train-v2.0.json" if mode == "train" else "dev-v2.0.json"
         examples = squad_utils.read_squad_examples(
-            input_file=os.path.join(args["data_dir"], "train-v2.0.json"), is_training=mode == "train")
+            input_file=os.path.join(args["data_dir"], file_name), is_training=mode == "train")
         features = squad_utils.convert_examples_to_features(
             examples=examples,
             tokenizer=tokenizer,
@@ -657,13 +684,17 @@ def main(_):
     #                     writer.write("\n")
     #
     # if args["do_predict"]:
-    #     tokenizer = AutoTokenizer.from_pretrained(args["output_dir"], do_lower_case=args["do_lower_case"])
-    #     model = TFAutoModelForTokenClassification.from_pretrained(args["output_dir"])
+    #     tokenizer = fine_tuning_utils.create_vocab(
+    #         vocab_file=args["vocab_file"],
+    #         do_lower_case=args["do_lower_case"],
+    #         spm_model_file=args["spm_model_file"],
+    #         hub_module=None)
+    #     model = SquadTFAlbertModel.from_pretrained(args["output_dir"])
     #     eval_batch_size = args["per_device_eval_batch_size"] * args["n_device"]
     #     predict_dataset, _ = load_and_cache_examples(
-    #         args, tokenizer, labels, pad_token_label_id, eval_batch_size, mode="test"
+    #         args, tokenizer, eval_batch_size, mode="test"
     #     )
-    #     y_true, y_pred, pred_loss = evaluate(args, strategy, model, tokenizer, labels, pad_token_label_id, mode="test")
+    #     y_true, y_pred, pred_loss = evaluate(args, strategy, model, tokenizer, mode="test")
     #     output_test_results_file = os.path.join(args["output_dir"], "test_results.txt")
     #     output_test_predictions_file = os.path.join(args["output_dir"], "test_predictions.txt")
     #     report = metrics.classification_report(y_true, y_pred, digits=4)
