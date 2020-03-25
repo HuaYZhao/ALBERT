@@ -144,7 +144,7 @@ class SquadQALayer(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         print(kwargs)
-        return self.forward(inputs, kwargs)
+        return self.forward(inputs, **kwargs)
 
 
 class SquadTFAlbertModel(TFAlbertPreTrainedModel):
@@ -171,7 +171,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         sequence_output = outputs[0]
 
         sequence_output = tf.transpose(sequence_output, [1, 0, 2])
-
-        return_dict = self.qa_layer(sequence_output, kwargs)
+        print(kwargs)
+        return_dict = self.qa_layer(sequence_output, **kwargs)
 
         return return_dict
