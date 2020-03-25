@@ -58,7 +58,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         is_training = mode == "train"
         bsz, max_seq_length, _ = tf.shape(sequence_output)
         p_mask = features["p_mask"]
-        return_dict = {}
+        outputs = ()
 
         start_logits = self.start_dense(sequence_output)
         start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
@@ -80,8 +80,8 @@ class SquadQALayer(tf.keras.layers.Layer):
             end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
             end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
 
-            return_dict["start_log_probs"] = start_log_probs
-            return_dict["end_log_probs"] = end_log_probs
+            outputs += (start_log_probs,)
+            outputs += (end_log_probs,)
         else:
             start_top_log_probs, start_top_index = tf.nn.top_k(
                 start_log_probs, k=start_n_top)
@@ -111,10 +111,10 @@ class SquadQALayer(tf.keras.layers.Layer):
                 end_top_index,
                 [-1, start_n_top * end_n_top])
 
-            return_dict["start_top_log_probs"] = start_top_log_probs
-            return_dict["start_top_index"] = start_top_index
-            return_dict["end_top_log_probs"] = end_top_log_probs
-            return_dict["end_top_index"] = end_top_index
+            outputs += (start_top_log_probs,)
+            outputs += (start_top_index,)
+            outputs += (end_top_log_probs,)
+            outputs += (end_top_index,)
 
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
@@ -137,9 +137,9 @@ class SquadQALayer(tf.keras.layers.Layer):
 
         cls_logits = tf.squeeze(cls_logits, -1)
 
-        return_dict["cls_logits"] = cls_logits
+        outputs += (cls_logits,)
 
-        return return_dict
+        return outputs
 
 
 class SquadTFAlbertModel(TFAlbertPreTrainedModel):
@@ -169,10 +169,10 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         sequence_output = tf.transpose(sequence_output, [1, 0, 2])
 
-        return_dict = self.qa_layer(sequence_output,
-                                    features=kwargs,
-                                    start_n_top=start_n_top,
-                                    end_n_top=end_n_top,
-                                    mode=mode)
+        outputs = self.qa_layer(sequence_output,
+                                features=kwargs,
+                                start_n_top=start_n_top,
+                                end_n_top=end_n_top,
+                                mode=mode)
 
-        return return_dict
+        return outputs
