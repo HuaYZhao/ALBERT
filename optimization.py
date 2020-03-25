@@ -107,6 +107,19 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
             name="Adafactor",
             epsilon1=1e-30,
             epsilon2=1e-3)
+    elif optimizer == "sgd":
+        tf.logging.info("using sgd")
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+    elif optimizer == "adam":
+        tf.logging.info("using official adam")
+        optimizer = tf.train.AdamOptimizer(
+            learning_rate=learning_rate,
+            beta1=0.9,
+            beta2=0.999,
+            epsilon=1e-6,
+            use_locking=False,
+            name='Adam')
+
     else:
         raise ValueError("Not supported optimizer: ", optimizer)
 
@@ -116,6 +129,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     tvars = tf.trainable_variables()
     grads = tf.gradients(
         loss, tvars, colocate_gradients_with_ops=colocate_gradients_with_ops)
+    grads = [tf.cast(g, tf.float32) for g in grads]
 
     # This is how the model was pre-trained.
     (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
@@ -160,6 +174,8 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
         for (grad, param) in grads_and_vars:
             if grad is None or param is None:
                 continue
+            param_fp16 = param
+            param = tf.cast(param, tf.float32)
 
             param_name = self._get_variable_name(param.name)
 
@@ -198,9 +214,10 @@ class AdamWeightDecayOptimizer(tf.train.Optimizer):
             update_with_lr = self.learning_rate * update
 
             next_param = param - update_with_lr
+            next_param = tf.cast(next_param, tf.bfloat16)
 
             assignments.extend(
-                [param.assign(next_param),
+                [param_fp16.assign(next_param),
                  m.assign(next_m),
                  v.assign(next_v)])
         return tf.group(*assignments, name=name)

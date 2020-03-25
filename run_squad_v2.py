@@ -31,6 +31,7 @@ import tokenization
 import six
 import tensorflow.compat.v1 as tf
 
+from tensorflow.contrib.framework import list_variables, load_variable
 from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
 from tensorflow.contrib import tpu as contrib_tpu
 
@@ -112,6 +113,8 @@ flags.DEFINE_integer(
     "this will be truncated to this length.")
 
 flags.DEFINE_bool("do_train", False, "Whether to run training.")
+
+flags.DEFINE_bool("fp16", True, "Whether to use bfloat16.")
 
 flags.DEFINE_bool("do_predict", False, "Whether to run eval on the dev set.")
 
@@ -216,6 +219,29 @@ def validate_flags_or_throw(albert_config):
             "(%d) + 3" % (FLAGS.max_seq_length, FLAGS.max_query_length))
 
 
+def cast_ckpt_vars_from_float32_to_bfloat16(ckpt_path):
+    checkpoint_path = os.path.join(os.path.dirname(ckpt_path), 'model_fp16.ckpt-best')  # 构造一下保存路径
+    if tf.gfile.Exists(f"{checkpoint_path}.meta"):
+        return checkpoint_path
+    with tf.Session() as sess:
+        new_var_list = []  # 新建一个空列表存储更新后的Variable变量
+        for var_name, _ in list_variables(ckpt_path):  # 得到checkpoint文件中所有的参数（名字，形状）元组
+            var = load_variable(ckpt_path, var_name)  # 得到上述参数的值
+
+            # 除了修改参数名称，还可以修改参数值（var）
+            new_dtype = tf.bfloat16 if var.dtype == 'float32' else var.dtype
+            fp16_var = tf.Variable(var, name=var_name, dtype=new_dtype)  # 使用加入前缀的新名称重新构造了参数
+            new_var_list.append(fp16_var)  # 把赋予新名称的参数加入空列表
+
+        print('starting to write fp16 checkpoint !')
+        saver = tf.train.Saver(var_list=new_var_list)  # 构造一个保存器
+        sess.run(tf.global_variables_initializer())  # 初始化一下参数（这一步必做）
+        saver.save(sess, checkpoint_path)  # 直接进行保存
+        print("finished modify float32 to float16 !")
+
+    return checkpoint_path
+
+
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -267,6 +293,9 @@ def main(_):
         # buffer in in the `input_fn`.
         rng = random.Random(12345)
         rng.shuffle(train_examples)
+
+    if FLAGS.fp16:
+        FLAGS.init_checkpoint = cast_ckpt_vars_from_float32_to_bfloat16(FLAGS.init_checkpoint)
 
     model_fn = squad_utils.v2_model_fn_builder(
         albert_config=albert_config,

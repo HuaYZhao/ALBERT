@@ -1665,62 +1665,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(loss)
                 return loss
 
-            def get_loss(outputs_, features_):
-                start_loss = compute_loss(
-                    outputs_["start_log_probs"], features_["start_positions"])
-                end_loss = compute_loss(
-                    outputs_["end_log_probs"], features_["end_positions"])
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
 
-                total_loss = (start_loss + end_loss) * 0.5
-
-                cls_logits = outputs["cls_logits"]
-                is_impossible = tf.reshape(features["is_impossible"], [-1])
-                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-                regression_loss = tf.reduce_mean(regression_loss)
-
-                # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-                # comparable to start_loss and end_loss
-                total_loss += regression_loss * 0.5
-                return total_loss
-
-            total_loss = get_loss(outputs, features)
-
-            def _scale_l2(x, norm_length):
-                # shape(x) = (batch, num_timesteps, d)
-                # Divide x by max(abs(x)) for a numerically stable L2 norm.
-                # 2norm(x) = a * 2norm(x/a)
-                # Scale over the full sequence, dims (1, 2)
-                alpha = tf.reduce_max(tf.abs(x), (1, 2), keep_dims=True) + 1e-12
-                l2_norm = alpha * tf.sqrt(
-                    tf.reduce_sum(tf.pow(x / alpha, 2), (1, 2), keep_dims=True) + 1e-6)
-                x_unit = x / l2_norm
-                return norm_length * x_unit
-
-            grad, = tf.gradients(
-                total_loss,
-                outputs["word_embedding_output"])
-            grad = tf.stop_gradient(grad)
-            perturb = _scale_l2(grad, 0.125)
-
-            outputs_adv = create_v2_model(
-                albert_config=albert_config,
-                is_training=is_training,
-                input_ids=input_ids,
-                input_mask=input_mask,
-                segment_ids=segment_ids,
-                use_one_hot_embeddings=use_one_hot_embeddings,
-                features=features,
-                max_seq_length=max_seq_length,
-                start_n_top=start_n_top,
-                end_n_top=end_n_top,
-                dropout_prob=dropout_prob,
-                hub_module=hub_module,
-                embedded_inputs=perturb)
-
-            adv_loss = get_loss(outputs_adv, features)
-
-            total_loss = 0.875 * total_loss + 0.125 * adv_loss
+            total_loss = (start_loss + end_loss) * 0.5
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -1736,7 +1686,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=tf.cast(total_loss, tf.float32),
+                loss=total_loss,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
