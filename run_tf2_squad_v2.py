@@ -232,7 +232,7 @@ def train(
             seq_length = tf.shape(input_ids)[1]
             train_features["start_n_top"] = args["start_n_top"]
             train_features["end_n_top"] = args["end_n_top"]
-            train_features["mode"] = mode
+            train_features["mode"] = "train"
 
             with tf.GradientTape() as tape:
                 outputs = model(input_ids, **train_features)
@@ -267,7 +267,7 @@ def train(
 
             return per_total_loss
 
-        per_example_losses = strategy.experimental_run_v2(step_fn, args=train_features)
+        per_example_losses = strategy.experimental_run_v2(step_fn, args=(train_features,))
         mean_loss = strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
 
         return mean_loss
