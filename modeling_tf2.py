@@ -142,9 +142,18 @@ class SquadQALayer(tf.keras.layers.Layer):
 
         return return_dict
 
-    def call(self, inputs, **kwargs):
-        print(kwargs)
-        return self.forward(inputs, **kwargs)
+    def call(self, sequence_output,
+             features,
+             start_n_top,
+             end_n_top,
+             mode,
+             **kwargs):
+        return self.forward(sequence_output,
+                            features,
+                            start_n_top,
+                            end_n_top,
+                            mode,
+                            **kwargs)
 
 
 class SquadTFAlbertModel(TFAlbertPreTrainedModel):
@@ -158,6 +167,8 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
     def call(self, input_ids, **kwargs):
         mode = kwargs.get("mode", "predict")
+        start_n_top = kwargs.get("start_n_top", 5)
+        end_n_top = kwargs.get("end_n_top", 5)
 
         input_mask = kwargs.get("input_mask", None)
         segment_ids = kwargs.get("segment_ids", None)
@@ -171,7 +182,11 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         sequence_output = outputs[0]
 
         sequence_output = tf.transpose(sequence_output, [1, 0, 2])
-        print(kwargs)
-        return_dict = self.qa_layer(sequence_output, **kwargs)
+
+        return_dict = self.qa_layer(sequence_output,
+                                    features=kwargs,
+                                    start_n_top=start_n_top,
+                                    end_n_top=end_n_top,
+                                    mode=mode)
 
         return return_dict
