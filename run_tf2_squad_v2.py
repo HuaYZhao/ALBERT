@@ -490,7 +490,7 @@ def load_and_cache_examples(args, tokenizer, batch_size, mode):
     )
     if os.path.exists(cached_features_file) and not args["overwrite_cache"]:
         logging.info("Loading features from cached file %s", cached_features_file)
-        dataset, size = load_cache(cached_features_file, args["max_seq_length"])
+        dataset, size = load_cache(cached_features_file, args["max_seq_length"], mode)
     else:
         logging.info("Creating features from dataset file at %s", args["data_dir"])
         examples = squad_utils.read_squad_examples(
