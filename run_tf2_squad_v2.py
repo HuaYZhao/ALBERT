@@ -231,10 +231,11 @@ def train(
             seq_length = tf.shape(train_features["input_ids"])[1]
 
             with tf.GradientTape() as tape:
-                outputs = model(train_features,
+                outputs = model(train_features.pop("input_ids"),
                                 start_n_top=args["start_n_top"],
                                 end_n_top=args["end_n_top"],
-                                mode="train")
+                                mode="train",
+                                **train_features)
 
                 def compute_loss(log_probs, positions):
                     one_hot_positions = tf.one_hot(

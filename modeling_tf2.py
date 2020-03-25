@@ -157,9 +157,9 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         start_n_top = kwargs.get("start_n_top", 5)
         end_n_top = kwargs.get("end_n_top", 5)
 
-        input_ids = inputs["input_ids"]
-        input_mask = inputs["input_mask"]
-        segment_ids = inputs["segment_ids"]
+        input_ids = inputs
+        input_mask = kwargs["input_mask"]
+        segment_ids = kwargs["segment_ids"]
 
         outputs = self.albert(input_ids,
                               attention_mask=input_mask,
@@ -172,7 +172,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         sequence_output = tf.transpose(sequence_output, [1, 0, 2])
 
         return_dict = self.qa_layer(sequence_output,
-                                    features=inputs,
+                                    features=kwargs,
                                     start_n_top=start_n_top,
                                     end_n_top=end_n_top,
                                     mode=mode)
