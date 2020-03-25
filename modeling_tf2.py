@@ -54,9 +54,7 @@ class SquadQALayer(tf.keras.layers.Layer):
                 mode,
                 **kwargs):
         is_training = mode == "train"
-        # max_seq_length, bsz, _ = tf.shape(sequence_output)
-        max_seq_length = 128
-        bsz = 4
+        max_seq_length, bsz, _ = tf.shape(sequence_output)
         print(sequence_output.shape)
         p_mask = features.get("p_mask", tf.ones([bsz, max_seq_length]))
         start_positions = features.get("start_positions", tf.zeros([bsz, max_seq_length]))
