@@ -47,7 +47,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             name="answer_dense_1",
             use_bias=False
         )
-        self.dropout = tf.keras.layers.Dropout(kwargs.get("dropout_prob", config.hidden_dropout_prob))
+        self.dropout = tf.keras.layers.Dropout(dropout_prob=kwargs.get("dropout_prob", config.classifier_dropout_prob))
 
     def forward(self,
                 sequence_output,
@@ -149,8 +149,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         self.albert = TFAlbertMainLayer(config, name="albert")
 
-        dropout_prob = kwargs.get("dropout_prob", config.classifier_dropout_prob)
-        self.qa_layer = SquadQALayer(config, dropout_prob=dropout_prob, name="qa_layer")
+        self.qa_layer = SquadQALayer(config, name="qa_layer")
 
     def call(self, inputs, **kwargs):
         mode = kwargs.get("mode", "predict")
