@@ -73,9 +73,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_features = tf.einsum("lbh,bl->bh", sequence_output, start_index)
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
             end_logits = self.end_dense0(tf.concat([sequence_output, start_features], axis=-1))
-            tf.keras.layers.LayerNormalization()
-            print(end_logits)
-            print(end_logits.shape)
             end_logits = self.LayerNorm(end_logits)
 
             end_logits = self.end_dense1(end_logits)
