@@ -185,8 +185,7 @@ def train(
                 * args["num_train_epochs"]
         )
 
-    writer = tf.summary.create_file_writer(args[""
-                                                ""])
+    writer = tf.summary.create_file_writer(os.path.join(args["output_dir"], 'summary'))
 
     with strategy.scope():
         loss_fct = tf.keras.losses.SparseCategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
