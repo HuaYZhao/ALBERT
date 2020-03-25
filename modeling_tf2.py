@@ -58,7 +58,8 @@ class SquadQALayer(tf.keras.layers.Layer):
                 **kwargs):
         is_training = mode == "train"
         bsz, max_seq_length, _ = tf.shape(sequence_output)
-        p_mask = features["p_mask"]
+        p_mask = features.get("p_mask", None)
+        start_positions = features.get("start_positions", None)
         return_dict = {}
 
         start_logits = self.start_dense(sequence_output)
@@ -67,7 +68,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
         if is_training:
-            start_positions = tf.reshape(features["start_positions"], [-1])
+            start_positions = tf.reshape(start_positions, [-1])
             start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
                                      dtype=tf.float32)
             start_features = tf.einsum("lbh,bl->bh", sequence_output, start_index)
