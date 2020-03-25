@@ -30,7 +30,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             kernel_initializer=get_initializer(config.initializer_range),
             name="end_dense_1"
         )
-        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm")
 
         self.answer_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
@@ -45,6 +44,9 @@ class SquadQALayer(tf.keras.layers.Layer):
             use_bias=False
         )
         self.dropout = tf.keras.layers.Dropout(rate=kwargs.get("dropout_prob", config.classifier_dropout_prob))
+        self.layer_norm1 = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm")
+        self.layer_norm2 = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm")
+
 
     def forward(self,
                 sequence_output,
@@ -73,7 +75,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_features = tf.einsum("lbh,bl->bh", sequence_output, start_index)
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
             end_logits = self.end_dense0(tf.concat([sequence_output, start_features], axis=-1))
-            # end_logits = self.layer_norm(end_logits)
+            end_logits = self.layer_norm1(end_logits)
 
             end_logits = self.end_dense1(end_logits)
             end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
@@ -94,7 +96,7 @@ class SquadQALayer(tf.keras.layers.Layer):
                                      [max_seq_length, 1, 1, 1])
             end_input = tf.concat([end_input, start_features], axis=-1)
             end_logits = self.end_dense0(end_input)
-            # end_logits = self.layer_norm(end_logits)
+            end_logits = self.layer_norm2(end_logits)
             end_logits = self.end_dense1(end_logits)
             end_logits = tf.reshape(end_logits, [max_seq_length, -1, start_n_top])
             end_logits = tf.transpose(end_logits, [1, 2, 0])
