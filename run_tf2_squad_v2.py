@@ -228,7 +228,9 @@ def train(
     @tf.function
     def train_step(train_features):
         def step_fn(train_features):
+            print(train_features)
             input_ids = train_features.pop("input_ids")
+            print(input_ids)
             seq_length = tf.shape(input_ids)[1]
             train_features["start_n_top"] = args["start_n_top"]
             train_features["end_n_top"] = args["end_n_top"]
