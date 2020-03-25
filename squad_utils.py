@@ -27,6 +27,7 @@ import six
 from six.moves import map
 from six.moves import range
 import tensorflow as tf
+from absl import logging
 
 _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
     "PrelimPrediction",
@@ -216,7 +217,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     for (example_index, example) in enumerate(examples):
 
         if example_index % 100 == 0:
-            tf.logging.info("Converting {}/{} pos {} neg {}".format(
+            logging.info("Converting {}/{} pos {} neg {}".format(
                 example_index, len(examples), cnt_pos, cnt_neg))
 
         query_tokens = tokenization.encode_ids(
@@ -312,7 +313,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
 
         if (all(v is None for v in orig_to_chartok_index) or
                 f[n - 1, m - 1] < 0.8 * n):
-            tf.logging.info("MISMATCH DETECTED!")
+            logging.info("MISMATCH DETECTED!")
             continue
 
         tok_start_to_orig_index = []
@@ -457,35 +458,35 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 end_position = 0
 
             if example_index < 20:
-                tf.logging.info("*** Example ***")
-                tf.logging.info("unique_id: %s" % (unique_id))
-                tf.logging.info("example_index: %s" % (example_index))
-                tf.logging.info("doc_span_index: %s" % (doc_span_index))
-                tf.logging.info("tok_start_to_orig_index: %s" % " ".join(
+                logging.info("*** Example ***")
+                logging.info("unique_id: %s" % (unique_id))
+                logging.info("example_index: %s" % (example_index))
+                logging.info("doc_span_index: %s" % (doc_span_index))
+                logging.info("tok_start_to_orig_index: %s" % " ".join(
                     [str(x) for x in cur_tok_start_to_orig_index]))
-                tf.logging.info("tok_end_to_orig_index: %s" % " ".join(
+                logging.info("tok_end_to_orig_index: %s" % " ".join(
                     [str(x) for x in cur_tok_end_to_orig_index]))
-                tf.logging.info("token_is_max_context: %s" % " ".join([
+                logging.info("token_is_max_context: %s" % " ".join([
                     "%d:%s" % (x, y) for (x, y) in six.iteritems(token_is_max_context)
                 ]))
-                tf.logging.info("input_pieces: %s" % " ".join(
+                logging.info("input_pieces: %s" % " ".join(
                     [tokenizer.sp_model.IdToPiece(x) for x in tokens]))
-                tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-                tf.logging.info(
+                logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+                logging.info(
                     "input_mask: %s" % " ".join([str(x) for x in input_mask]))
-                tf.logging.info(
+                logging.info(
                     "segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
 
                 if is_training and span_is_impossible:
-                    tf.logging.info("impossible example span")
+                    logging.info("impossible example span")
 
                 if is_training and not span_is_impossible:
                     pieces = [tokenizer.sp_model.IdToPiece(token) for token in
                               tokens[start_position: (end_position + 1)]]
                     answer_text = tokenizer.sp_model.DecodePieces(pieces)
-                    tf.logging.info("start_position: %d" % (start_position))
-                    tf.logging.info("end_position: %d" % (end_position))
-                    tf.logging.info(
+                    logging.info("start_position: %d" % (start_position))
+                    logging.info("end_position: %d" % (end_position))
+                    logging.info(
                         "answer: %s" % (tokenization.printable_text(answer_text)))
 
                     # note(zhiliny): With multi processing,
@@ -524,7 +525,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
             else:
                 cnt_pos += 1
 
-    tf.logging.info("Total number of instances: {} = pos {} neg {}".format(
+    logging.info("Total number of instances: {} = pos {} neg {}".format(
         cnt_pos + cnt_neg, cnt_pos, cnt_neg))
     return features
 
