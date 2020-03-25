@@ -458,7 +458,7 @@ def load_cache(cached_file, max_seq_length, mode):
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
-                t = tf.compat.v1.to_int32(t)
+                t = tf.cast(t, tf.int32)
             example[name] = t
 
         return example
