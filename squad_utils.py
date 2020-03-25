@@ -214,8 +214,7 @@ def _convert_index(index, pos, m=None, is_start=True):
 
 
 def convert_examples_to_features(examples, tokenizer, max_seq_length,
-                                 doc_stride, max_query_length, is_training,
-                                 output_fn, do_lower_case):
+                                 doc_stride, max_query_length, is_training, do_lower_case):
     """Loads a data file into a list of `InputBatch`s."""
 
     cnt_pos, cnt_neg = 0, 0
@@ -223,6 +222,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
     max_n, max_m = 1024, 1024
     f = np.zeros((max_n, max_m), dtype=np.float32)
 
+    features = []
     for (example_index, example) in enumerate(examples):
 
         if example_index % 100 == 0:
@@ -524,8 +524,9 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
                 is_impossible=span_is_impossible,
                 p_mask=p_mask)
 
-            # Run callback
-            output_fn(feature)
+            # # Run callback
+            # output_fn(feature)
+            features.append(feature)
 
             unique_id += 1
             if span_is_impossible:
@@ -535,6 +536,7 @@ def convert_examples_to_features(examples, tokenizer, max_seq_length,
 
     tf.logging.info("Total number of instances: {} = pos {} neg {}".format(
         cnt_pos + cnt_neg, cnt_pos, cnt_neg))
+    return features
 
 
 def _check_is_max_context(doc_spans, cur_span_index, position):
