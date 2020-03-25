@@ -262,7 +262,8 @@ def train(
 
                 grads = tape.gradient(loss, model.trainable_variables)
 
-                gradient_accumulator(grads)
+                # gradient_accumulator(grads)
+                optimizer.apply_gradients(list(zip(grads, model.trainable_variables)), args["max_grad_norm"])
 
             return per_total_loss
 
@@ -287,7 +288,7 @@ def train(
                 loss = train_step(train_features)
 
                 if step % args["gradient_accumulation_steps"] == 0:
-                    strategy.experimental_run_v2(apply_gradients)
+                    # strategy.experimental_run_v2(apply_gradients)
 
                     loss_metric(loss)
 
