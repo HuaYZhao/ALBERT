@@ -3,10 +3,7 @@ import tensorflow as tf
 from transformers import (
     TFAlbertMainLayer,
     TFAlbertPreTrainedModel,
-    TFAlbertForSequenceClassification,
     AlbertConfig,
-    AlbertTokenizer,
-    AlbertForQuestionAnswering
 )
 
 from transformers.modeling_tf_utils import get_initializer
