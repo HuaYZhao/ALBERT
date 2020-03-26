@@ -25,12 +25,14 @@ from transformers import (
 
 from modeling_tf2 import SquadTFAlbertModel
 
-try:
-    from fastprogress import master_bar, progress_bar
-except ImportError:
-    from fastprogress.fastprogress import master_bar, progress_bar
+# try:
+#     from fastprogress import master_bar, progress_bar
+# except ImportError:
+#     from fastprogress.fastprogress import master_bar, progress_bar
 
-    from fastprogress.fastprogress import force_console_behavior
+from fastprogress.fastprogress import force_console_behavior
+
+master_bar, progress_bar = force_console_behavior()
 
 MODEL_CONFIG_CLASSES = list(TF_MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -337,7 +339,7 @@ def train(
 
                 train_iterator.child.comment = f"loss : {loss_metric.result()}"
                 if step % 10 == 0:
-                    train_iterator.write(f"loss step {step}: {loss_metric.result()}")
+                    logging.info(f"loss step {step}: {loss_metric.result()}")
 
                 step += 1
 
