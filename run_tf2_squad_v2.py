@@ -274,7 +274,7 @@ def train(
 
     for epoch in train_iterator:
         epoch_iterator = progress_bar(
-            train_dataset, total=num_train_steps, parent=train_iterator, display=args["n_device"] > 1
+            train_dataset, total=num_train_steps, parent=train_iterator, display=False
         )
         step = 1
         loss_metric.reset_states()
@@ -288,14 +288,14 @@ def train(
 
                     global_step += 1
 
-                    # if args["logging_steps"] > 0 and global_step % args["logging_steps"] == 0:
-                    #     # Log metrics
-                    #     if (
-                    #             args["n_device"] == 1 and args["evaluate_during_training"]
-                    #     ):  # Only evaluate when single GPU otherwise metrics may not average well
-                    #         y_true, y_pred, eval_loss = evaluate(
-                    #             args, strategy, model, tokenizer, labels, pad_token_label_id, mode="dev"
-                    #         )
+                    if args["logging_steps"] > 0 and global_step % args["logging_steps"] == 0:
+                        # Log metrics
+                        if (
+                                args["n_device"] == 1 and args["evaluate_during_training"]
+                        ):  # Only evaluate when single GPU otherwise metrics may not average well
+                            evaluate(
+                                args, strategy, model, tokenizer, mode="dev"
+                            )
                     #         report = metrics.classification_report(y_true, y_pred, digits=4)
                     #
                     #         logging.info("Eval at step " + str(global_step) + "\n" + report)
@@ -336,6 +336,9 @@ def train(
                         logging.info("Saving model checkpoint to %s", output_dir)
 
                 train_iterator.child.comment = f"loss : {loss_metric.result()}"
+                if step % 10 == 0:
+                    train_iterator.write(f"loss step {step}: {loss_metric.result()}")
+
                 step += 1
 
         train_iterator.write(f"loss epoch {epoch + 1}: {loss_metric.result()}")
@@ -343,86 +346,87 @@ def train(
     logging.info("  Training took time = {}".format(datetime.datetime.now() - current_time))
 
 
-# def evaluate(args, strategy, model, tokenizer, mode):
-#     eval_batch_size = args["per_device_eval_batch_size"] * args["n_device"]
-#     eval_dataset, size = load_and_cache_examples(
-#         args, tokenizer, eval_batch_size, mode=mode
-#     )
-#     eval_dataset = strategy.experimental_distribute_dataset(eval_dataset)
-#     preds = None
-#     num_eval_steps = math.ceil(size / eval_batch_size)
-#     master = master_bar(range(1))
-#     eval_iterator = progress_bar(eval_dataset, total=num_eval_steps, parent=master, display=args["n_device"] > 1)
-#
-#     logging.info("***** Running evaluation *****")
-#     logging.info("  Num examples = %d", size)
-#     logging.info("  Batch size = %d", eval_batch_size)
-#
-#     all_results = []
-#     for eval_features in eval_iterator:
-#         input_ids = eval_features.pop("input_ids")
-#         seq_length = tf.shape(input_ids)[1]
-#         eval_features["start_n_top"] = args["start_n_top"]
-#         eval_features["end_n_top"] = args["end_n_top"]
-#         eval_features["mode"] = mode
-#
-#         with strategy.scope():
-#             outputs = model(input_ids, **eval_features)
-#             if len(all_results) % 1000 == 0:
-#                 logging.info("Processing example: %d" % (len(all_results)))
-#             for idx in range(eval_batch_size):
-#                 unique_id = int(eval_features["unique_ids"][idx])
-#                 start_top_log_probs = (
-#                     [float(x) for x in outputs["start_top_log_probs"]])
-#             start_top_index = [int(x) for x in result["start_top_index"].flat]
-#             end_top_log_probs = (
-#                 [float(x) for x in result["end_top_log_probs"].flat])
-#             end_top_index = [int(x) for x in result["end_top_index"].flat]
-#
-#             cls_logits = float(result["cls_logits"].flat[0])
-#             all_results.append(
-#                 squad_utils.RawResultV2(
-#                     unique_id=unique_id,
-#                     start_top_log_probs=start_top_log_probs,
-#                     start_top_index=start_top_index,
-#                     end_top_log_probs=end_top_log_probs,
-#                     end_top_index=end_top_index,
-#                     cls_logits=cls_logits))
-#             predictions = {
-#                 "unique_ids": eval_features["unique_ids"],
-#                 "start_top_index": outputs["start_top_index"],
-#                 "start_top_log_probs": outputs["start_top_log_probs"],
-#                 "end_top_index": outputs["end_top_index"],
-#                 "end_top_log_probs": outputs["end_top_log_probs"],
-#                 "cls_logits": outputs["cls_logits"]
-#             }
-#             tmp_logits = tf.reshape(logits, (-1, len(labels) + 1))
-#             active_loss = tf.reshape(eval_features["input_mask"], (-1,))
-#             active_logits = tf.boolean_mask(tmp_logits, active_loss)
-#             tmp_eval_labels = tf.reshape(eval_labels, (-1,))
-#             active_labels = tf.boolean_mask(tmp_eval_labels, active_loss)
-#             cross_entropy = loss_fct(active_labels, active_logits)
-#             loss += tf.reduce_sum(cross_entropy) * (1.0 / eval_batch_size)
-#
-#         if preds is None:
-#             preds = logits.numpy()
-#             label_ids = eval_labels.numpy()
-#         else:
-#             preds = np.append(preds, logits.numpy(), axis=0)
-#             label_ids = np.append(label_ids, eval_labels.numpy(), axis=0)
-#
-#     preds = np.argmax(preds, axis=2)
-#     y_pred = [[] for _ in range(label_ids.shape[0])]
-#     y_true = [[] for _ in range(label_ids.shape[0])]
-#     loss = loss / num_eval_steps
-#
-#     for i in range(label_ids.shape[0]):
-#         for j in range(label_ids.shape[1]):
-#             if label_ids[i, j] != pad_token_label_id:
-#                 y_pred[i].append(labels[preds[i, j] - 1])
-#                 y_true[i].append(labels[label_ids[i, j] - 1])
-#
-#     return y_true, y_pred, loss.numpy()
+def evaluate(args, strategy, model, tokenizer, mode):
+    eval_batch_size = args["per_device_eval_batch_size"] * args["n_device"]
+    eval_dataset, size = load_and_cache_examples(
+        args, tokenizer, eval_batch_size, mode=mode
+    )
+    eval_dataset = strategy.experimental_distribute_dataset(eval_dataset)
+    preds = None
+    num_eval_steps = math.ceil(size / eval_batch_size)
+    master = master_bar(range(1))
+    eval_iterator = progress_bar(eval_dataset, total=num_eval_steps, parent=master, display=args["n_device"] > 1)
+
+    logging.info("***** Running evaluation *****")
+    logging.info("  Num examples = %d", size)
+    logging.info("  Batch size = %d", eval_batch_size)
+
+    all_results = []
+    for eval_features in eval_iterator:
+        input_ids = eval_features.pop("input_ids")
+        seq_length = tf.shape(input_ids)[1]
+        eval_features["start_n_top"] = args["start_n_top"]
+        eval_features["end_n_top"] = args["end_n_top"]
+        eval_features["mode"] = mode
+
+        with strategy.scope():
+            outputs = model(input_ids, **eval_features)
+            if len(all_results) % 1000 == 0:
+                logging.info("Processing example: %d" % (len(all_results)))
+            print(outputs)
+    #         for idx in range(eval_batch_size):
+    #             unique_id = int(eval_features["unique_ids"][idx])
+    #             start_top_log_probs = (
+    #                 [float(x) for x in outputs["start_top_log_probs"]])
+    #         start_top_index = [int(x) for x in result["start_top_index"].flat]
+    #         end_top_log_probs = (
+    #             [float(x) for x in result["end_top_log_probs"].flat])
+    #         end_top_index = [int(x) for x in result["end_top_index"].flat]
+    #
+    #         cls_logits = float(result["cls_logits"].flat[0])
+    #         all_results.append(
+    #             squad_utils.RawResultV2(
+    #                 unique_id=unique_id,
+    #                 start_top_log_probs=start_top_log_probs,
+    #                 start_top_index=start_top_index,
+    #                 end_top_log_probs=end_top_log_probs,
+    #                 end_top_index=end_top_index,
+    #                 cls_logits=cls_logits))
+    #         predictions = {
+    #             "unique_ids": eval_features["unique_ids"],
+    #             "start_top_index": outputs["start_top_index"],
+    #             "start_top_log_probs": outputs["start_top_log_probs"],
+    #             "end_top_index": outputs["end_top_index"],
+    #             "end_top_log_probs": outputs["end_top_log_probs"],
+    #             "cls_logits": outputs["cls_logits"]
+    #         }
+    #         tmp_logits = tf.reshape(logits, (-1, len(labels) + 1))
+    #         active_loss = tf.reshape(eval_features["input_mask"], (-1,))
+    #         active_logits = tf.boolean_mask(tmp_logits, active_loss)
+    #         tmp_eval_labels = tf.reshape(eval_labels, (-1,))
+    #         active_labels = tf.boolean_mask(tmp_eval_labels, active_loss)
+    #         cross_entropy = loss_fct(active_labels, active_logits)
+    #         loss += tf.reduce_sum(cross_entropy) * (1.0 / eval_batch_size)
+    #
+    #     if preds is None:
+    #         preds = logits.numpy()
+    #         label_ids = eval_labels.numpy()
+    #     else:
+    #         preds = np.append(preds, logits.numpy(), axis=0)
+    #         label_ids = np.append(label_ids, eval_labels.numpy(), axis=0)
+    #
+    # preds = np.argmax(preds, axis=2)
+    # y_pred = [[] for _ in range(label_ids.shape[0])]
+    # y_true = [[] for _ in range(label_ids.shape[0])]
+    # loss = loss / num_eval_steps
+    #
+    # for i in range(label_ids.shape[0]):
+    #     for j in range(label_ids.shape[1]):
+    #         if label_ids[i, j] != pad_token_label_id:
+    #             y_pred[i].append(labels[preds[i, j] - 1])
+    #             y_true[i].append(labels[label_ids[i, j] - 1])
+    #
+    # return y_true, y_pred, loss.numpy()
 
 
 def load_cache(cached_file, max_seq_length, mode):
@@ -512,7 +516,7 @@ def load_and_cache_examples(args, tokenizer, batch_size, mode):
         dataset, size = load_cache(cached_features_file, args["max_seq_length"], mode)
     else:
         logging.info("Creating features from dataset file at %s", args["data_dir"])
-        file_name = "train-v2.0.json" if mode == "train" else "dev-v2.0.json"
+        file_name = "train-v2.0.json" if mode != "test" else "dev-v2.0.json"
         examples = squad_utils.read_squad_examples(
             input_file=os.path.join(args["data_dir"], file_name), is_training=mode == "train")
         features = squad_utils.convert_examples_to_features(
