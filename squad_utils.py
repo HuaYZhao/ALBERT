@@ -1741,8 +1741,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                               project_layers_num=1, sample_num=4)
 
             # total_loss += loss_rl * 0.5
-            theta_ce = tf.get_variable('theta_ce', (), tf.float32, initializer=lambda: tf.constant(0.5))
-            theta_rl = tf.get_variable('theta_rl', (), tf.float32, initializer=lambda: tf.constant(0.5))
+            theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
+            theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
             total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
                          loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
 
