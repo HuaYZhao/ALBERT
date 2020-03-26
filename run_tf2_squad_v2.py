@@ -566,6 +566,11 @@ def main(_):
 
     if args["fp16"]:
         tf.config.optimizer.set_experimental_options({"auto_mixed_precision": True})
+        policy = tf.keras.mixed_precision.experimental.Policy(
+            'mixed_bfloat16')
+        tf.keras.mixed_precision.experimental.set_policy(policy)
+        print('Compute dtype: %s' % policy.compute_dtype)
+        print('Variable dtype: %s' % policy.variable_dtype)
 
     if args["tpu"]:
         resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=args["tpu"])
