@@ -1321,10 +1321,6 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
                          output_prediction_file,
                          output_nbest_file, output_null_log_odds_file,
                          null_score_diff_threshold):
-    with tf.gfile.GFile('gs://albert-root/data/train/albert_xxlarge_v1_384_128_64_40/no_answer_predictions.json',
-                        "r") as reader:
-        no_answer_prediction = json.load(reader)
-
     """Write final predictions to the json file and log-odds of null if needed."""
     tf.logging.info("Writing predictions to: %s" % (output_prediction_file))
     tf.logging.info("Writing nbest to: %s" % (output_nbest_file))
@@ -1426,8 +1422,7 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
         assert best_non_null_entry is not None
 
         score_diff = sum(cls_dict[example_index]) / len(cls_dict[example_index])
-        alpha = 0.4
-        scores_diff_json[example.qas_id] = alpha * score_diff + (1 - alpha) * no_answer_prediction[example.qas_id]
+        scores_diff_json[example.qas_id] = score_diff
         # predict null answers when null threshold is provided
         if null_score_diff_threshold is None or score_diff < null_score_diff_threshold:
             all_predictions[example.qas_id] = best_non_null_entry.text
