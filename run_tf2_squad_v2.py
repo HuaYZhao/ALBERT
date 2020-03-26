@@ -279,11 +279,10 @@ def train(
 
         with strategy.scope():
             for train_features in epoch_iterator:
-                loss = train_step(train_features)
+                train_step(train_iterator)
 
                 if step % args["gradient_accumulation_steps"] == 0:
                     # strategy.experimental_run_v2(apply_gradients)
-                    train_step(train_iterator)
 
                     global_step += 1
 
