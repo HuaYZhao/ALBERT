@@ -263,7 +263,7 @@ def train(
 
     @tf.function
     def train_step(iterator):
-        strategy.run(_replicated_step, args=(next(iterator),))
+        strategy.experimental_run_v2(_replicated_step, args=(next(iterator),))
 
     current_time = datetime.datetime.now()
     train_iterator = master_bar(range(args["num_train_epochs"]))
