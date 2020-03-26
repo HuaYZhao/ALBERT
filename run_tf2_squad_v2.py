@@ -197,6 +197,11 @@ def train(
         optimizer = create_optimizer(args["learning_rate"], num_train_steps, num_warmup_steps)
 
         if args["fp16"]:
+            policy = tf.keras.mixed_precision.experimental.Policy(
+                'mixed_bfloat16')
+            tf.keras.mixed_precision.experimental.set_policy(policy)
+            print('Compute dtype: %s' % policy.compute_dtype)
+            print('Variable dtype: %s' % policy.variable_dtype)
             optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(optimizer, "dynamic")
 
         loss_metric = tf.keras.metrics.Mean(name="loss", dtype=tf.float32)

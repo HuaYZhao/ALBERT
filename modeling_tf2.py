@@ -62,6 +62,9 @@ class SquadQALayer(tf.keras.layers.Layer):
         return_dict = {}
 
         start_logits = self.start_dense(sequence_output)
+        print('start_logits.dtype: %s' % start_logits.dtype.name)
+        # 'kernel' is dense1's variable
+        print('start_dense.kernel.dtype: %s' % self.start_dense.kernel.dtype.name)
         start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
         start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
