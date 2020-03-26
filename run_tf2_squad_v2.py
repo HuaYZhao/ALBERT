@@ -196,7 +196,6 @@ def train(
             optimizer = tf.keras.mixed_precision.experimental.LossScaleOptimizer(optimizer, "dynamic")
 
         loss_metric = tf.keras.metrics.Mean(name="loss", dtype=tf.float32)
-        gradient_accumulator = GradientAccumulator()
 
     logging.info("***** Running training *****")
     logging.info("  Num examples = %d", num_train_examples)
@@ -211,66 +210,60 @@ def train(
 
     model.summary()
 
+    def loss_fn(outputs, features, seq_length=384):
+        def compute_loss(log_probs, positions):
+            one_hot_positions = tf.one_hot(
+                positions, depth=seq_length, dtype=tf.float32)
+
+            loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+            return loss
+
+        start_loss = compute_loss(
+            outputs["start_log_probs"], features["start_positions"])
+        end_loss = compute_loss(
+            outputs["end_log_probs"], features["end_positions"])
+
+        total_loss = (start_loss + end_loss) * 0.5
+
+        cls_logits = outputs["cls_logits"]
+        is_impossible = tf.reshape(features["is_impossible"], [-1])
+        regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
+
+        total_loss += 0.5 * regression_loss
+        return total_loss
+
+    def _replicated_step(features):
+        """Replicated training step."""
+
+        input_ids = features.pop("input_ids")
+        seq_length = tf.shape(input_ids)[1]
+        features["start_n_top"] = args["start_n_top"]
+        features["end_n_top"] = args["end_n_top"]
+        with tf.GradientTape() as tape:
+            model_outputs = model(input_ids, **features, training=True)
+            loss = loss_fn(model_outputs, features, seq_length=seq_length)
+            # Raw loss is used for reporting in metrics/logs.
+            raw_loss = loss
+            if args["tpu"]:
+                # Scales down the loss for gradients to be invariant from replicas.
+                loss = loss / strategy.num_replicas_in_sync
+
+        if isinstance(optimizer,
+                      tf.keras.mixed_precision.experimental.LossScaleOptimizer):
+            with tape:
+                scaled_loss = optimizer.get_scaled_loss(loss)
+            scaled_grads = tape.gradient(scaled_loss, model.trainable_variables)
+            grads = optimizer.get_unscaled_gradients(scaled_grads)
+        else:
+            grads = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(grads, model.trainable_variables), args["max_grad_norm"])
+        # For reporting, the metric takes the mean of losses.
+        loss_metric.update_state(raw_loss)
+
     @tf.function
-    def apply_gradients():
-        grads_and_vars = []
-
-        for gradient, variable in zip(gradient_accumulator.gradients, model.trainable_variables):
-            if gradient is not None:
-                scaled_gradient = gradient / (args["n_device"] * args["gradient_accumulation_steps"])
-                grads_and_vars.append((scaled_gradient, variable))
-            else:
-                grads_and_vars.append((gradient, variable))
-
-        optimizer.apply_gradients(grads_and_vars, args["max_grad_norm"])
-        gradient_accumulator.reset()
-
-    @tf.function
-    def train_step(train_features):
-        def step_fn(train_features):
-            input_ids = train_features.pop("input_ids")
-            seq_length = tf.shape(input_ids)[1]
-            train_features["start_n_top"] = args["start_n_top"]
-            train_features["end_n_top"] = args["end_n_top"]
-            train_features["mode"] = "train"
-
-            with tf.GradientTape() as tape:
-                outputs = model(input_ids, **train_features)
-
-                def compute_loss(log_probs, positions):
-                    one_hot_positions = tf.one_hot(
-                        positions, depth=seq_length, dtype=tf.float32)
-
-                    loss = - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
-                    return loss
-
-                start_loss = compute_loss(
-                    outputs["start_log_probs"], train_features["start_positions"])
-                end_loss = compute_loss(
-                    outputs["end_log_probs"], train_features["end_positions"])
-
-                total_loss = (start_loss + end_loss) * 0.5
-
-                cls_logits = outputs["cls_logits"]
-                is_impossible = tf.reshape(train_features["is_impossible"], [-1])
-                regression_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
-
-                per_total_loss = total_loss + 0.5 * regression_loss
-
-                loss = tf.reduce_sum(per_total_loss) * (1.0 / train_batch_size)
-
-                grads = tape.gradient(loss, model.trainable_variables)
-
-                # gradient_accumulator(grads)
-                optimizer.apply_gradients(list(zip(grads, model.trainable_variables)), args["max_grad_norm"])
-
-            return per_total_loss
-
-        per_example_losses = strategy.experimental_run_v2(step_fn, args=(train_features,))
-        mean_loss = strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
-
-        return mean_loss
+    def train_step(iterator):
+        strategy.run(_replicated_step, args=(next(iterator),))
 
     current_time = datetime.datetime.now()
     train_iterator = master_bar(range(args["num_train_epochs"]))
@@ -282,6 +275,7 @@ def train(
             train_dataset, total=num_train_steps, parent=train_iterator, display=args["n_device"] > 1
         )
         step = 1
+        loss_metric.reset_states()
 
         with strategy.scope():
             for train_features in epoch_iterator:
@@ -289,8 +283,7 @@ def train(
 
                 if step % args["gradient_accumulation_steps"] == 0:
                     # strategy.experimental_run_v2(apply_gradients)
-
-                    loss_metric(loss)
+                    train_step(train_iterator)
 
                     global_step += 1
 
@@ -345,8 +338,6 @@ def train(
                 step += 1
 
         train_iterator.write(f"loss epoch {epoch + 1}: {loss_metric.result()}")
-
-        loss_metric.reset_states()
 
     logging.info("  Training took time = {}".format(datetime.datetime.now() - current_time))
 

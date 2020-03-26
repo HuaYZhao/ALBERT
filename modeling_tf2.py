@@ -52,9 +52,8 @@ class SquadQALayer(tf.keras.layers.Layer):
                 features,
                 start_n_top,
                 end_n_top,
-                mode,
+                training,
                 **kwargs):
-        is_training = mode == "train"
         input_shape = tf.shape(sequence_output)
         bsz = input_shape[1]
         max_seq_length = input_shape[0]
@@ -67,7 +66,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
-        if is_training:
+        if training:
             start_positions = tf.reshape(start_positions, [-1])
             start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
                                      dtype=tf.float32)
@@ -131,7 +130,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         ans_feature = tf.concat([start_feature, cls_feature], -1)
         ans_feature = self.answer_dense0(ans_feature)
 
-        ans_feature = self.dropout(ans_feature, training=is_training)
+        ans_feature = self.dropout(ans_feature, training=training)
 
         cls_logits = self.answer_dense1(ans_feature)
 
@@ -145,13 +144,13 @@ class SquadQALayer(tf.keras.layers.Layer):
              features,
              start_n_top,
              end_n_top,
-             mode,
+             training,
              **kwargs):
         return self.forward(sequence_output,
                             features,
                             start_n_top,
                             end_n_top,
-                            mode,
+                            training,
                             **kwargs)
 
 
@@ -165,7 +164,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         self.qa_layer = SquadQALayer(config, name="qa_layer")
 
     def call(self, input_ids, **kwargs):
-        mode = kwargs.get("mode", "predict")
+        training = kwargs.get("training",False)
         start_n_top = kwargs.get("start_n_top", 5)
         end_n_top = kwargs.get("end_n_top", 5)
 
@@ -175,7 +174,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               attention_mask=input_mask,
                               token_type_ids=segment_ids,
                               inputs_embeds=None,
-                              training=mode == "train")
+                              training=training)
 
         sequence_output = outputs[0]
 
@@ -185,6 +184,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                     features=kwargs,
                                     start_n_top=start_n_top,
                                     end_n_top=end_n_top,
-                                    mode=mode)
+                                    training=training)
 
         return return_dict
