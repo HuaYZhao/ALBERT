@@ -70,7 +70,7 @@ def get_mlm_logits(input_tensor, albert_config, mlm_positions, output_weights):
                 units=albert_config.embedding_size,
                 activation=modeling.get_activation(albert_config.hidden_act),
                 kernel_initializer=modeling.create_initializer(
-                    albert_config.initializer_range))
+                    albert_config.initializer_range), )
             input_tensor = modeling.layer_norm(input_tensor)
 
         # The output weights are the same as the input embeddings, but there is
@@ -78,7 +78,8 @@ def get_mlm_logits(input_tensor, albert_config, mlm_positions, output_weights):
         output_bias = tf.get_variable(
             "output_bias",
             shape=[albert_config.vocab_size],
-            initializer=tf.zeros_initializer())
+            initializer=tf.zeros_initializer(),
+            dtype=tf.bfloat16)
         logits = tf.matmul(
             input_tensor, output_weights, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
@@ -95,9 +96,10 @@ def get_sentence_order_logits(input_tensor, albert_config):
             "output_weights",
             shape=[2, albert_config.hidden_size],
             initializer=modeling.create_initializer(
-                albert_config.initializer_range))
+                albert_config.initializer_range),
+            dtype=tf.bfloat16)
         output_bias = tf.get_variable(
-            "output_bias", shape=[2], initializer=tf.zeros_initializer())
+            "output_bias", shape=[2], initializer=tf.zeros_initializer(), dtype=tf.bfloat16)
 
         logits = tf.matmul(input_tensor, output_weights, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
