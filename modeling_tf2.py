@@ -20,6 +20,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             1,
             kernel_initializer=get_initializer(config.initializer_range),
             name="start_dense_0",
+            autocast=False
         )
         print("layer dtype:", self.dtype, self.start_dense.dtype)
         self.end_dense0 = tf.keras.layers.Dense(
@@ -186,7 +187,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                   inputs_embeds=None,
                                   training=training)
             print({v.name: v.dtype for v in self.albert.trainable_variables})
-            print({v.name: v.dtype for v in self.albert.variables})
 
             sequence_output = outputs[0]
 
