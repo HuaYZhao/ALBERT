@@ -1460,6 +1460,14 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
+
+    from tcn import TCN
+    partial_attention = TCN(nb_filters=albert_config.hidden_size, kernel_size=3, nb_stacks=1,
+                            dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
+                            dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='relu',
+                            kernel_initializer="he_normal", use_batch_norm=False, use_layer_norm=True)(output)
+    output += partial_attention
+
     output = tf.transpose(output, [1, 0, 2])
 
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
