@@ -97,7 +97,7 @@ class ResidualBlock(Layer):
                                                         padding=self.padding,
                                                         name=name,
                                                         kernel_initializer=self.kernel_initializer,
-                                                        dtype=tf.bfloat16))
+                                                        dtype=self.dtype))
 
                 if self.use_batch_norm:
                     self._add_and_activate_layer(BatchNormalization(dtype=self.dtype))
@@ -117,7 +117,7 @@ class ResidualBlock(Layer):
                                                    padding='same',
                                                    name=name,
                                                    kernel_initializer=self.kernel_initializer,
-                                                   dtype=tf.bfloat16)
+                                                   dtype=self.dtype)
 
             else:
                 self.shape_match_conv = Lambda(lambda x: x, name='identity')
