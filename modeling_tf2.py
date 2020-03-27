@@ -183,6 +183,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               token_type_ids=segment_ids,
                               inputs_embeds=None,
                               training=training)
+        print(self.albert.trainable_variables)
 
         sequence_output = outputs[0]
 
