@@ -127,7 +127,7 @@ def build_model(sess):
     get_sentence_order_logits(model.get_pooled_output(), albert_config)
 
     checkpoint_path = os.path.join(FLAGS.albert_directory, FLAGS.checkpoint_name)
-    tvars = [tf.cast(v, tf.float32) if v.dtype is tf.bfloat16 else v for v in tf.trainable_variables()]
+    tvars = tf.trainable_variables()
     (assignment_map, initialized_variable_names
      ) = modeling.get_assignment_map_from_checkpoint(tvars, checkpoint_path)
 
@@ -151,6 +151,7 @@ def main(_):
     my_vars = []
     for var in tf.global_variables():
         if "lamb_v" not in var.name and "lamb_m" not in var.name:
+            print(var)
             my_vars.append(var)
     saver = tf.train.Saver(my_vars)
     saver.save(sess, FLAGS.export_path)
