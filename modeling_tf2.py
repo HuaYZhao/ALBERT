@@ -42,7 +42,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             kernel_initializer=get_initializer(config.initializer_range),
             name="answer_dense_1",
             use_bias=False,
-            dtype=tf.float32
         )
         self.dropout = tf.keras.layers.Dropout(rate=kwargs.get("dropout_prob", config.classifier_dropout_prob))
         self.layer_norm1 = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm1")
