@@ -1,7 +1,6 @@
 from pprint import pprint
 
 import tensorflow as tf
-from tensorflow.python.keras.mixed_precision.experimental import policy
 
 from transformers import (
     TFAlbertMainLayer,
@@ -21,7 +20,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             kernel_initializer=get_initializer(config.initializer_range),
             name="start_dense_0",
         )
-        print("layer dtype:", self.dtype, self.start_dense.dtype)
         self.end_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
             kernel_initializer=get_initializer(config.initializer_range),
@@ -145,7 +143,7 @@ class SquadQALayer(tf.keras.layers.Layer):
 
         cls_logits = tf.squeeze(cls_logits, -1)
 
-        return_dict["cls_logits"] = cls_logits
+        return_dict["cls_logits"] = tf.cast(cls_logits, tf.float32)
 
         return return_dict
 
@@ -179,23 +177,21 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
 
         input_mask = kwargs.get("input_mask", None)
         segment_ids = kwargs.get("segment_ids", None)
-        with policy.policy_scope(policy._global_policy):
-            outputs = self.albert(input_ids,
-                                  attention_mask=input_mask,
-                                  token_type_ids=segment_ids,
-                                  inputs_embeds=None,
-                                  training=training)
-            print({v.name: v.dtype for v in self.albert.trainable_variables})
 
-            sequence_output = outputs[0]
+        outputs = self.albert(input_ids,
+                              attention_mask=input_mask,
+                              token_type_ids=segment_ids,
+                              inputs_embeds=None,
+                              training=training)
 
-            sequence_output = tf.transpose(sequence_output, [1, 0, 2])
+        sequence_output = outputs[0]
 
-            return_dict = self.qa_layer(sequence_output,
-                                        features=kwargs,
-                                        start_n_top=start_n_top,
-                                        end_n_top=end_n_top,
-                                        training=training)
-        pprint({v.name: v.dtype for v in self.qa_layer.trainable_variables})
+        sequence_output = tf.transpose(sequence_output, [1, 0, 2])
+
+        return_dict = self.qa_layer(sequence_output,
+                                    features=kwargs,
+                                    start_n_top=start_n_top,
+                                    end_n_top=end_n_top,
+                                    training=training)
 
         return return_dict
