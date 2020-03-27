@@ -73,7 +73,6 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
                 "weight",
                 shape=[self.config.vocab_size, self.config.embedding_size],
                 initializer=get_initializer(self.config.initializer_range),
-                experimental_autocast=False,
             )
             print("build word embedding dtype", self.word_embeddings.dtype)
         super().build(input_shape)
