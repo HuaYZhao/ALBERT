@@ -17,7 +17,8 @@ class SquadQALayer(tf.keras.layers.Layer):
         self.start_dense = tf.keras.layers.Dense(
             1,
             kernel_initializer=get_initializer(config.initializer_range),
-            name="start_dense_0"
+            name="start_dense_0",
+            dtype=tf.float32,
         )
         self.end_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
@@ -93,8 +94,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_index = tf.one_hot(start_top_index,
                                      depth=max_seq_length, axis=-1, dtype=inputs.dtype)
             start_index = tf.reshape(start_index, [bsz, start_n_top, max_seq_length])
-            print(start_log_probs.shape)
-            print(start_index.shape)
             start_features = tf.einsum("lbh,bkl->bkh", inputs, start_index)
             end_input = tf.tile(inputs[:, :, None],
                                 [1, 1, start_n_top, 1])
