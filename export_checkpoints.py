@@ -153,6 +153,7 @@ def cast_ckpt_vars_from_bfloat16_to_float32(ckpt_path):
         tvar_names = [v.name for v in tf.trainable_variables()]
         new_var_list = []  # 新建一个空列表存储更新后的Variable变量
         for var_name, _ in list_variables(ckpt_path):  # 得到checkpoint文件中所有的参数（名字，形状）元组
+            print(var_name)
             if var_name not in tvar_names:
                 continue
             var = load_variable(ckpt_path, var_name)  # 得到上述参数的值
