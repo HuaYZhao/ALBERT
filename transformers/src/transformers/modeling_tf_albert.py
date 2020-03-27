@@ -110,7 +110,7 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
 
         seq_length = input_shape[1]
         if position_ids is None:
-            position_ids = tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :]
+            position_ids = tf.tile(tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :], [3, 1])
         if token_type_ids is None:
             token_type_ids = tf.fill(input_shape, 0)
 
