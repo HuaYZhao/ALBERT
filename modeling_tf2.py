@@ -84,7 +84,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             return_dict["start_log_probs"] = tf.cast(start_log_probs, tf.float32)
             return_dict["end_log_probs"] = tf.cast(end_log_probs, tf.float32)
         else:
-            start_top_log_probs, start_top_index = tf.nn.top_k(
+            start_top_log_probs, start_top_index = tf.math.top_k(
                 start_log_probs, k=start_n_top)
             print(start_top_index.shape)
             start_index = tf.one_hot(start_top_index,
@@ -106,7 +106,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             end_logits_masked = end_logits * (
                     1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
             end_log_probs = tf.cast(tf.nn.log_softmax(end_logits_masked, -1), tf.float32)
-            end_top_log_probs, end_top_index = tf.nn.top_k(
+            end_top_log_probs, end_top_index = tf.math.top_k(
                 end_log_probs, k=end_n_top)
             end_top_log_probs = tf.reshape(
                 end_top_log_probs,
