@@ -564,6 +564,7 @@ def main(_):
         policy = tf.keras.mixed_precision.experimental.Policy(
             'mixed_bfloat16')
         tf.keras.mixed_precision.experimental.set_policy(policy)
+        tf.keras.backend.set_floatx('float32')
         print('Compute dtype: %s' % policy.compute_dtype)
         print('Variable dtype: %s' % policy.variable_dtype)
 
