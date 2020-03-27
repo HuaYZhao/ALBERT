@@ -3,4 +3,4 @@
 tensorflow_hub==0.7
 # tensorflow-gpu==1.15  # GPU version of TensorFlow
 sentencepiece
-keras-tcn
+# keras-tcn

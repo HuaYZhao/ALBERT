@@ -1462,10 +1462,13 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     return_dict = {}
 
     from tcn import TCN
-    partial_attention = TCN(nb_filters=albert_config.hidden_size, kernel_size=3, nb_stacks=1,
-                            dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
-                            dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='relu',
-                            kernel_initializer="he_normal", use_batch_norm=False, use_layer_norm=True)(output)
+    from tensorflow.python.keras.mixed_precision.experimental import policy
+    policy1 = tf.keras.mixed_precision.experimental.Policy("bfloat16")
+    with policy.policy_scope(policy1):
+        partial_attention = TCN(nb_filters=albert_config.hidden_size, kernel_size=3, nb_stacks=1,
+                                dilations=[1, 2, 4, 8, 16, 32, 64], padding='same', use_skip_connections=True,
+                                dropout_rate=albert_config.hidden_dropout_prob, return_sequences=True, activation='relu',
+                                kernel_initializer="he_normal", use_batch_norm=False, use_layer_norm=True)(output)
     output += partial_attention
 
     output = tf.transpose(output, [1, 0, 2])
