@@ -57,10 +57,11 @@ class SquadQALayer(tf.keras.layers.Layer):
         input_shape = tf.shape(sequence_output)
         bsz = input_shape[1]
         max_seq_length = input_shape[0]
-        p_mask = tf.cast(features.get("p_mask", tf.ones([bsz, max_seq_length])), tf.float32)
+        p_mask = tf.cast(features.get("p_mask", tf.ones([bsz, max_seq_length])), sequence_output.dtype)
         start_positions = features.get("start_positions", tf.zeros([bsz, max_seq_length]))
         return_dict = {}
 
+        print("sequence_output", sequence_output.dtype)
         start_logits = self.start_dense(sequence_output)
         print('start_logits.dtype: %s' % start_logits.dtype.name)
         # 'kernel' is dense1's variable

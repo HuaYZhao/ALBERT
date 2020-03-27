@@ -117,7 +117,6 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
         if inputs_embeds is None:
             inputs_embeds = tf.gather(self.word_embeddings, input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-        print("position_embedding_dtype", self.position_embeddings.embeddings.dtype)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = tf.keras.layers.Add()(
