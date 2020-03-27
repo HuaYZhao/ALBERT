@@ -73,7 +73,7 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
                 "weight",
                 shape=[self.config.vocab_size, self.config.embedding_size],
                 initializer=get_initializer(self.config.initializer_range),
-                dtype=tf.float32
+                experimental_autocast=False,
             )
             print("build word embedding dtype", self.word_embeddings.dtype)
         super().build(input_shape)
@@ -485,7 +485,7 @@ class TFAlbertMainLayer(tf.keras.layers.Layer):
     config_class = AlbertConfig
 
     def __init__(self, config, **kwargs):
-        super().__init__(experimental_autocast=False, **kwargs)
+        super().__init__(**kwargs)
         self.num_hidden_layers = config.num_hidden_layers
 
         self.embeddings = TFAlbertEmbeddings(config, name="embeddings")
