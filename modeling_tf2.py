@@ -183,7 +183,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               inputs_embeds=None,
                               training=training)
         # print(self.albert.trainable_variables)
-        print(policy.global_policy.variable_dtype)
+        print(policy._global_policy)
 
         sequence_output = outputs[0]
 
@@ -194,5 +194,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                     start_n_top=start_n_top,
                                     end_n_top=end_n_top,
                                     training=training)
+        print(self.qa_layer.trainable_variables)
 
         return return_dict
