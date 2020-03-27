@@ -88,7 +88,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_top_log_probs, start_top_index = tf.math.top_k(
                 start_log_probs, k=start_n_top)
             start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=tf.float32)
+                                     depth=max_seq_length, axis=-1, dtype=sequence_output.dtype)
             start_index = tf.reshape(start_index, [bsz, start_n_top, max_seq_length])
             print(start_log_probs.shape)
             print(start_index.shape)
