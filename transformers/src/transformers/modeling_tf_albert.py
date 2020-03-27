@@ -119,7 +119,9 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
+        # embeddings = inputs_embeds + position_embeddings + token_type_embeddings
+        embeddings = tf.keras.layers.Add()(
+            [inputs_embeds, position_embeddings, token_type_embeddings])
         print(embeddings.dtype)
         embeddings = self.LayerNorm(embeddings)
         print(embeddings.dtype)
