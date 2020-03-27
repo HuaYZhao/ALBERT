@@ -20,6 +20,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             kernel_initializer=get_initializer(config.initializer_range),
             name="start_dense_0",
         )
+        print("layer dtype:",self.dtype)
         self.end_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
             kernel_initializer=get_initializer(config.initializer_range),
