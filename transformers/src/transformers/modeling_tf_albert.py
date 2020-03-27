@@ -265,7 +265,7 @@ class TFAlbertAttention(TFBertSelfAttention):
         # (batch size, num_heads, seq_len_q, seq_len_k)
         attention_scores = tf.matmul(query_layer, key_layer, transpose_b=True)
         # scale attention_scores
-        dk = tf.cast(shape_list(key_layer)[-1], tf.float32)
+        dk = tf.cast(shape_list(key_layer)[-1], attention_scores.dtype)
         attention_scores = attention_scores / tf.math.sqrt(dk)
 
         if attention_mask is not None:
