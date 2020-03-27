@@ -182,7 +182,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               token_type_ids=segment_ids,
                               inputs_embeds=None,
                               training=training)
-        pprint({v.name: v.dtype for v in self.albert.trainable_variables})
+        print({v.name: v.dtype for v in self.albert.trainable_variables})
         print(policy._global_policy.variable_dtype)
 
         sequence_output = outputs[0]
