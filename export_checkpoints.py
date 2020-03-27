@@ -124,9 +124,9 @@ def build_model(sess):
         token_type_ids=segment_ids,
         use_one_hot_embeddings=False)
 
-    get_mlm_logits(model.get_sequence_output(), albert_config,
-                   mlm_positions, model.get_embedding_table())
-    get_sentence_order_logits(model.get_pooled_output(), albert_config)
+    # get_mlm_logits(model.get_sequence_output(), albert_config,
+    #                mlm_positions, model.get_embedding_table())
+    # get_sentence_order_logits(model.get_pooled_output(), albert_config)
 
     checkpoint_path = os.path.join(FLAGS.albert_directory, FLAGS.checkpoint_name)
     tvars = tf.trainable_variables()
