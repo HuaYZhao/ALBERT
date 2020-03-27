@@ -8,7 +8,7 @@ from transformers import (
 
 from transformers.modeling_tf_utils import get_initializer
 from tensorflow.python.keras.mixed_precision.experimental import policy
-
+from pprint import pprint
 
 class SquadQALayer(tf.keras.layers.Layer):
 
@@ -182,8 +182,8 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               token_type_ids=segment_ids,
                               inputs_embeds=None,
                               training=training)
-        # print(self.albert.trainable_variables)
-        print(policy._global_policy)
+        pprint({v.name: v.dtype for v in self.albert.trainable_variables})
+        print(policy._global_policy.variable_dtype)
 
         sequence_output = outputs[0]
 
@@ -194,6 +194,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                     start_n_top=start_n_top,
                                     end_n_top=end_n_top,
                                     training=training)
-        print({v.name: v.dtype for v in self.qa_layer.trainable_variables})
+        pprint({v.name: v.dtype for v in self.qa_layer.trainable_variables})
 
         return return_dict
