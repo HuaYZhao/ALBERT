@@ -89,8 +89,8 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_index = tf.one_hot(start_top_index,
                                      depth=max_seq_length, axis=-1, dtype=tf.float32)
             print(start_log_probs.shape)
-            start_index.set_shape([bsz, start_n_top, max_seq_length])
             print(start_index.shape)
+            start_index.set_shape([bsz, start_n_top, max_seq_length])
             start_features = tf.einsum("lbh,bkl->bkh", sequence_output, start_index)
             end_input = tf.tile(sequence_output[:, :, None],
                                 [1, 1, start_n_top, 1])
