@@ -194,6 +194,6 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                     start_n_top=start_n_top,
                                     end_n_top=end_n_top,
                                     training=training)
-        print(self.qa_layer.trainable_variables)
+        print({v.name: v.dtype for v in self.qa_layer.trainable_variables})
 
         return return_dict
