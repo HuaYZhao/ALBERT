@@ -41,7 +41,8 @@ class SquadQALayer(tf.keras.layers.Layer):
             1,
             kernel_initializer=get_initializer(config.initializer_range),
             name="answer_dense_1",
-            use_bias=False
+            use_bias=False,
+            dtype=tf.float32
         )
         self.dropout = tf.keras.layers.Dropout(rate=kwargs.get("dropout_prob", config.classifier_dropout_prob))
         self.layer_norm1 = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm1")
@@ -67,7 +68,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         print('start_dense.kernel.dtype: %s' % self.start_dense.kernel.dtype.name)
         start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
         start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
-        start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
+        start_log_probs = tf.cast(tf.nn.log_softmax(start_logits_masked, -1), dtype=tf.float32)
 
         if training:
             start_positions = tf.reshape(start_positions, [-1])
@@ -81,7 +82,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             end_logits = self.end_dense1(end_logits)
             end_logits = tf.transpose(tf.squeeze(end_logits, -1), [1, 0])
             end_logits_masked = end_logits * (1 - p_mask) - 1e30 * p_mask
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
+            end_log_probs = tf.cast(tf.nn.log_softmax(end_logits_masked, -1), tf.float32)
 
             return_dict["start_log_probs"] = start_log_probs
             return_dict["end_log_probs"] = end_log_probs
@@ -103,7 +104,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             end_logits = tf.transpose(end_logits, [1, 2, 0])
             end_logits_masked = end_logits * (
                     1 - p_mask[:, None]) - 1e30 * p_mask[:, None]
-            end_log_probs = tf.nn.log_softmax(end_logits_masked, -1)
+            end_log_probs = tf.cast(tf.nn.log_softmax(end_logits_masked, -1), tf.float32)
             end_top_log_probs, end_top_index = tf.nn.top_k(
                 end_log_probs, k=end_n_top)
             end_top_log_probs = tf.reshape(
@@ -167,7 +168,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
         self.qa_layer = SquadQALayer(config, name="qa_layer")
 
     def call(self, input_ids, **kwargs):
-        training = kwargs.get("training",False)
+        training = kwargs.get("training", False)
         start_n_top = kwargs.get("start_n_top", 5)
         end_n_top = kwargs.get("end_n_top", 5)
 

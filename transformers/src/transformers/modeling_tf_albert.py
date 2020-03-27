@@ -61,7 +61,7 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
-        self.LayerNorm = tf.keras.layers.LayerNormalization(axis=-1, epsilon=config.layer_norm_eps, name="LayerNorm")
+        self.LayerNorm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm")
         self.dropout = tf.keras.layers.Dropout(config.hidden_dropout_prob)
 
     def build(self, input_shape):
@@ -107,9 +107,10 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
         else:
             input_shape = shape_list(inputs_embeds)[:-1]
 
+        bsz = input_shape[0]
         seq_length = input_shape[1]
         if position_ids is None:
-            position_ids = tf.tile(tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :], [3, 1])
+            position_ids = tf.tile(tf.range(seq_length, dtype=tf.int32)[tf.newaxis, :], [bsz, 1])
         if token_type_ids is None:
             token_type_ids = tf.fill(input_shape, 0)
 
@@ -118,12 +119,9 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        # embeddings = inputs_embeds + position_embeddings + token_type_embeddings
         embeddings = tf.keras.layers.Add()(
             [inputs_embeds, position_embeddings, token_type_embeddings])
-        print(embeddings.dtype)
         embeddings = self.LayerNorm(embeddings)
-        print(embeddings.dtype)
         embeddings = self.dropout(embeddings, training=training)
         return embeddings
 
