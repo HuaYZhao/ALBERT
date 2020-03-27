@@ -153,7 +153,8 @@ def main(_):
     my_vars = []
     for var in tf.global_variables():
         if "lamb_v" not in var.name and "lamb_m" not in var.name:
-            var = var.assign(tf.cast(var, tf.float32)) if "bfloat16" in var.dtype.name else var
+            var = tf.get_variable(var.name, dtype=tf.float32,
+                                  initializer=tf.cast(var, tf.float32)) if "bfloat16" in var.dtype.name else var
             my_vars.append(var)
     saver = tf.train.Saver(my_vars)
     saver.save(sess, FLAGS.export_path)
