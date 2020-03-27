@@ -75,6 +75,7 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
                 initializer=get_initializer(self.config.initializer_range),
                 dtype=tf.float32
             )
+            print("build word embedding dtype",self.word_embeddings.dtype)
         super().build(input_shape)
 
     def call(self, inputs, mode="embedding", training=False):
