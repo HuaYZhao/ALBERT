@@ -7,6 +7,7 @@ from transformers import (
 )
 
 from transformers.modeling_tf_utils import get_initializer
+from tensorflow.python.keras.mixed_precision.experimental import policy
 
 
 class SquadQALayer(tf.keras.layers.Layer):
@@ -18,7 +19,6 @@ class SquadQALayer(tf.keras.layers.Layer):
             1,
             kernel_initializer=get_initializer(config.initializer_range),
             name="start_dense_0",
-            dtype=tf.float32,
         )
         self.end_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
@@ -183,6 +183,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               inputs_embeds=None,
                               training=training)
         # print(self.albert.trainable_variables)
+        print(policy.global_policy)
 
         sequence_output = outputs[0]
 
