@@ -127,7 +127,7 @@ def build_model(sess):
     get_sentence_order_logits(model.get_pooled_output(), albert_config)
 
     checkpoint_path = os.path.join(FLAGS.albert_directory, FLAGS.checkpoint_name)
-    tvars = tf.trainable_variables()
+    tvars = [tf.cast(v, tf.float32) if v.dtype is tf.bfloat16 else v for v in tf.trainable_variables()]
     (assignment_map, initialized_variable_names
      ) = modeling.get_assignment_map_from_checkpoint(tvars, checkpoint_path)
 
