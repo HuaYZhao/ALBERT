@@ -1668,12 +1668,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(loss)
                 return loss
 
-            # start_loss = compute_loss(
-            #     outputs["start_log_probs"], features["start_positions"])
-            # end_loss = compute_loss(
-            #     outputs["end_log_probs"], features["end_positions"])
-            #
-            # total_loss = (start_loss + end_loss) * 0.5
+            start_loss = compute_loss(
+                outputs["start_log_probs"], features["start_positions"])
+            end_loss = compute_loss(
+                outputs["end_log_probs"], features["end_positions"])
+
+            total_loss = (start_loss + end_loss) * 0.5
 
             def project_encoder_layers(outputs, features, project_layers_num=4):
                 logits = [[]] * project_layers_num
@@ -1735,16 +1735,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
             logits = project_encoder_layers(outputs, features, project_layers_num=1)
-            loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
-                                         project_layers_num=1, sample_num=4)
+            # loss_ce = cross_entropy_loss(logits, features["start_positions"], features["end_positions"],
+            #                              project_layers_num=1, sample_num=4)
             loss_rl = rl_loss(logits, features["start_positions"], features["end_positions"],
                               project_layers_num=1, sample_num=4)
 
             # total_loss += loss_rl * 0.5
-            theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
-            theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
-            total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
-                         loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
+            # theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(0.5))
+            # total_loss = (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+            #              loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            total_loss += 0.5 * loss_rl
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
