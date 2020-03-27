@@ -65,6 +65,7 @@ class SquadQALayer(tf.keras.layers.Layer):
         start_logits = self.start_dense(sequence_output)
         start_logits = tf.transpose(tf.squeeze(start_logits, -1), [1, 0])
         start_logits_masked = start_logits * (1 - p_mask) - 1e30 * p_mask
+        print(start_logits_masked.dtype)
         start_log_probs = tf.nn.log_softmax(start_logits_masked, -1)
 
         if training:
