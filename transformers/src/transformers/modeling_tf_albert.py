@@ -61,8 +61,7 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
-        self.LayerNorm = tf.keras.layers.LayerNormalization(axis=-1, epsilon=config.layer_norm_eps, name="LayerNorm",
-                                                            dtype=tf.float32)
+        self.LayerNorm = tf.keras.layers.LayerNormalization(axis=-1, epsilon=config.layer_norm_eps, name="LayerNorm")
         self.dropout = tf.keras.layers.Dropout(config.hidden_dropout_prob)
 
     def build(self, input_shape):
