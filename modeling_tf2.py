@@ -14,7 +14,7 @@ from transformers.modeling_tf_utils import get_initializer
 class SquadQALayer(tf.keras.layers.Layer):
 
     def __init__(self, config: AlbertConfig, **kwargs):
-        super().__init__(experimental_autocast=False, **kwargs)
+        super().__init__(**kwargs)
         self.config = config
         self.start_dense = tf.keras.layers.Dense(
             1,
