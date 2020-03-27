@@ -1,14 +1,14 @@
+from pprint import pprint
+
 import tensorflow as tf
+from tensorflow.python.keras.mixed_precision.experimental import policy
 
 from transformers import (
     TFAlbertMainLayer,
     TFAlbertPreTrainedModel,
     AlbertConfig,
 )
-
 from transformers.modeling_tf_utils import get_initializer
-from tensorflow.python.keras.mixed_precision.experimental import policy
-from pprint import pprint
 
 
 class SquadQALayer(tf.keras.layers.Layer):
@@ -165,7 +165,7 @@ class SquadQALayer(tf.keras.layers.Layer):
 
 class SquadTFAlbertModel(TFAlbertPreTrainedModel):
     def __init__(self, config, *inputs, **kwargs):
-        super(SquadTFAlbertModel, self).__init__(config, *inputs, **kwargs)
+        super(SquadTFAlbertModel, self).__init__(config, autocast=False, *inputs, **kwargs)
         self.num_labels = config.num_labels
 
         self.albert = TFAlbertMainLayer(config, name="albert")
