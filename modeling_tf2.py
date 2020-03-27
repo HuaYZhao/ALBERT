@@ -10,6 +10,7 @@ from transformers.modeling_tf_utils import get_initializer
 from tensorflow.python.keras.mixed_precision.experimental import policy
 from pprint import pprint
 
+
 class SquadQALayer(tf.keras.layers.Layer):
 
     def __init__(self, config: AlbertConfig, **kwargs):
@@ -20,7 +21,7 @@ class SquadQALayer(tf.keras.layers.Layer):
             kernel_initializer=get_initializer(config.initializer_range),
             name="start_dense_0",
         )
-        print("layer dtype:",self.dtype)
+        print("layer dtype:", self.dtype, self.start_dense.dtype)
         self.end_dense0 = tf.keras.layers.Dense(
             config.hidden_size,
             kernel_initializer=get_initializer(config.initializer_range),
