@@ -48,21 +48,21 @@ class SquadQALayer(tf.keras.layers.Layer):
         self.layer_norm2 = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm2")
 
     def forward(self,
-                sequence_output,
+                inputs,
                 features,
                 start_n_top,
                 end_n_top,
                 training,
                 **kwargs):
-        input_shape = tf.shape(sequence_output)
+        input_shape = tf.shape(inputs)
         bsz = input_shape[1]
         max_seq_length = input_shape[0]
-        p_mask = tf.cast(features.get("p_mask", tf.ones([bsz, max_seq_length])), sequence_output.dtype)
+        p_mask = tf.cast(features.get("p_mask", tf.ones([bsz, max_seq_length])), inputs.dtype)
         start_positions = features.get("start_positions", tf.zeros([bsz, max_seq_length]))
         return_dict = {}
 
-        print("sequence_output", sequence_output.dtype)
-        start_logits = self.start_dense(sequence_output)
+        print("sequence_output", inputs.dtype)
+        start_logits = self.start_dense(inputs)
         print('start_logits.dtype: %s' % start_logits.dtype.name)
         # 'kernel' is dense1's variable
         print('start_dense.kernel.dtype: %s' % self.start_dense.kernel.dtype.name)
@@ -74,10 +74,10 @@ class SquadQALayer(tf.keras.layers.Layer):
         if training:
             start_positions = tf.reshape(start_positions, [-1])
             start_index = tf.one_hot(start_positions, depth=max_seq_length, axis=-1,
-                                     dtype=tf.float32)
-            start_features = tf.einsum("lbh,bl->bh", sequence_output, start_index)
+                                     dtype=inputs.dtype)
+            start_features = tf.einsum("lbh,bl->bh", inputs, start_index)
             start_features = tf.tile(start_features[None], [max_seq_length, 1, 1])
-            end_logits = self.end_dense0(tf.concat([sequence_output, start_features], axis=-1))
+            end_logits = self.end_dense0(tf.concat([inputs, start_features], axis=-1))
             end_logits = self.layer_norm1(end_logits)
 
             end_logits = self.end_dense1(end_logits)
@@ -91,12 +91,12 @@ class SquadQALayer(tf.keras.layers.Layer):
             start_top_log_probs, start_top_index = tf.math.top_k(
                 start_log_probs, k=start_n_top)
             start_index = tf.one_hot(start_top_index,
-                                     depth=max_seq_length, axis=-1, dtype=sequence_output.dtype)
+                                     depth=max_seq_length, axis=-1, dtype=inputs.dtype)
             start_index = tf.reshape(start_index, [bsz, start_n_top, max_seq_length])
             print(start_log_probs.shape)
             print(start_index.shape)
-            start_features = tf.einsum("lbh,bkl->bkh", sequence_output, start_index)
-            end_input = tf.tile(sequence_output[:, :, None],
+            start_features = tf.einsum("lbh,bkl->bkh", inputs, start_index)
+            end_input = tf.tile(inputs[:, :, None],
                                 [1, 1, start_n_top, 1])
             start_features = tf.tile(start_features[None],
                                      [max_seq_length, 1, 1, 1])
@@ -125,13 +125,13 @@ class SquadQALayer(tf.keras.layers.Layer):
 
         cls_index = tf.one_hot(tf.zeros([bsz], dtype=tf.int32),
                                max_seq_length,
-                               axis=-1, dtype=tf.float32)
-        cls_feature = tf.einsum("lbh,bl->bh", sequence_output, cls_index)
+                               axis=-1, dtype=inputs.dtype)
+        cls_feature = tf.einsum("lbh,bl->bh", inputs, cls_index)
 
         # get the representation of START
         start_p = tf.nn.softmax(start_logits_masked, axis=-1,
                                 name="softmax_start")
-        start_feature = tf.einsum("lbh,bl->bh", sequence_output, start_p)
+        start_feature = tf.einsum("lbh,bl->bh", inputs, start_p)
 
         # note(zhiliny): no dependency on end_feature so that we can obtain
         # one single `cls_logits` for each sample
@@ -183,7 +183,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                               token_type_ids=segment_ids,
                               inputs_embeds=None,
                               training=training)
-        print(self.albert.trainable_variables)
+        # print(self.albert.trainable_variables)
 
         sequence_output = outputs[0]
 
