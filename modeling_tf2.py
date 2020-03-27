@@ -186,7 +186,7 @@ class SquadTFAlbertModel(TFAlbertPreTrainedModel):
                                   inputs_embeds=None,
                                   training=training)
             print({v.name: v.dtype for v in self.albert.trainable_variables})
-            print(policy._global_policy.variable_dtype)
+            print({v.name: v.dtype for v in self.albert.variables})
 
             sequence_output = outputs[0]
 
