@@ -15,7 +15,6 @@
 # limitations under the License.
 """ TF 2.0 ALBERT model. """
 
-
 import logging
 
 import tensorflow as tf
@@ -24,7 +23,6 @@ from .configuration_albert import AlbertConfig
 from .file_utils import add_start_docstrings, add_start_docstrings_to_callable
 from .modeling_tf_bert import ACT2FN, TFBertSelfAttention
 from .modeling_tf_utils import TFPreTrainedModel, get_initializer, keras_serializable, shape_list
-
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +61,8 @@ class TFAlbertEmbeddings(tf.keras.layers.Layer):
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
-        self.LayerNorm = tf.keras.layers.LayerNormalization(epsilon=config.layer_norm_eps, name="LayerNorm")
+        self.LayerNorm = tf.keras.layers.LayerNormalization(axis=-1, epsilon=config.layer_norm_eps, name="LayerNorm",
+                                                            dtype=tf.float32)
         self.dropout = tf.keras.layers.Dropout(config.hidden_dropout_prob)
 
     def build(self, input_shape):
@@ -413,7 +412,7 @@ class TFAlbertTransformer(tf.keras.layers.Layer):
                 [
                     hidden_states,
                     attention_mask,
-                    head_mask[group_idx * layers_per_group : (group_idx + 1) * layers_per_group],
+                    head_mask[group_idx * layers_per_group: (group_idx + 1) * layers_per_group],
                 ],
                 training=training,
             )
@@ -511,14 +510,14 @@ class TFAlbertMainLayer(tf.keras.layers.Layer):
         raise NotImplementedError
 
     def call(
-        self,
-        inputs,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        training=False,
+            self,
+            inputs,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            training=False,
     ):
         if isinstance(inputs, (tuple, list)):
             input_ids = inputs[0]
