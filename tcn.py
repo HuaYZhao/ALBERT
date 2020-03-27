@@ -100,9 +100,9 @@ class ResidualBlock(Layer):
                                                         dtype=tf.bfloat16))
 
                 if self.use_batch_norm:
-                    self._add_and_activate_layer(BatchNormalization())
+                    self._add_and_activate_layer(BatchNormalization(dtype=self.dtype))
                 elif self.use_layer_norm:
-                    self._add_and_activate_layer(LayerNormalization())
+                    self._add_and_activate_layer(LayerNormalization(dtype=self.dtype))
 
                 self._add_and_activate_layer(Activation('relu'))
                 self._add_and_activate_layer(SpatialDropout1D(rate=self.dropout_rate))
