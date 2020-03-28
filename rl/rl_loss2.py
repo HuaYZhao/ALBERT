@@ -62,7 +62,7 @@ def greedy_search_end_with_start(sps, els):
     els = els + -100000. * sps_mask
     sort_ids = tf.argsort(els, axis=-1, direction="DESCENDING")
 
-    end_greedy = tf.cast(sort_ids[:, 0], tf.int32)
+    end_greedy = tf.cast(sort_ids[:, 0], tf.int64)
     print("end_greedy_shape", end_greedy.shape)
 
     return end_greedy
