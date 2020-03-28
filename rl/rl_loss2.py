@@ -62,7 +62,7 @@ def greedy_search_end_with_start(sps, els):
     els = els + -100000. * sps_mask
     sort_ids = tf.argsort(els, axis=-1, direction="DESCENDING")
 
-    end_greedy = tf.cast(sort_ids[:, 0], tf.int64)
+    end_greedy = tf.cast(sort_ids[:, 0], tf.int32)
     print("end_greedy_shape", end_greedy.shape)
 
     return end_greedy
@@ -114,7 +114,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
-    guess_start_greedy = tf.argmax(start_logits, axis=1)
+    guess_start_greedy = tf.argmax(start_logits, axis=1,output_type=tf.int32)
 
     guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_logits)
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
