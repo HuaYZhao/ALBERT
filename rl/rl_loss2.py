@@ -134,4 +134,4 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     print("loss_shape", loss.shape)
 
     cond_loss = tf.where(em, tf.zeros_like(loss), loss)  # 只有预测错误的才做rl
-    return cond_loss
+    return tf.reduce_mean(cond_loss)
