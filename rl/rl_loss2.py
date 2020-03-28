@@ -117,7 +117,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
                                                  answer_start, answer_end), dtype=tf.float32)
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
-    # has_answer =
+    has_no_answer = tf.logical_and(tf.equal(0, answer_start), tf.equal(0, answer_end))
 
     guess_start_sample = tf.multinomial(start_logits, sample_num)
     guess_end_sample = tf.multinomial(end_logits, sample_num)
@@ -129,5 +129,5 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
     loss = surr_loss + tf.stop_gradient(-tf.reduce_mean(r, axis=-1) - surr_loss)
 
-    cond_loss = tf.where(em, tf.zeros_like(loss), loss)  # 只有预测错误的才做rl
+    cond_loss = tf.where(tf.logical_or(em, has_no_answer), tf.zeros_like(loss), loss)  # 只有预测错误的才做rl
     return tf.reduce_mean(cond_loss)
