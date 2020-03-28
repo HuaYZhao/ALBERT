@@ -1749,7 +1749,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 1.,
                 tf.train.get_or_create_global_step(),
                 num_train_steps,
-                end_learning_rate=0.0,
+                end_learning_rate=0.5,
                 power=1.0,
                 cycle=False)
             total_loss += (1 - alpha) * loss_rl
