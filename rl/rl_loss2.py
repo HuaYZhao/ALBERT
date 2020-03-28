@@ -81,7 +81,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
     r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
-    return r  # [bs, sample]
+    return tf.reduce_mean(r, axis=-1)  # [bs, 1]
 
 
 def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num):
@@ -102,7 +102,6 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     end_loss = r * \
                tf.nn.sparse_softmax_cross_entropy_with_logits(
                    logits=end_logits, labels=guess_end)
-    print(start_loss.shape)
     start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
     end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
     loss = tf.reduce_mean(start_loss + end_loss, axis=1)
