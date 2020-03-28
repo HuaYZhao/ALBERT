@@ -1673,7 +1673,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_loss = compute_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
-            loss_ce = (start_loss + end_loss) * 0.5
+            total_loss = (start_loss + end_loss) * 0.5
 
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
             # logits = project_encoder_layers(outputs, features, project_layers_num=1)
@@ -1683,7 +1683,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
 
-            # total_loss += loss_rl * 0.5
+            total_loss += loss_rl * 0.5
             # theta_ce = tf.get_variable('theta_ce', (), dtype=tf.float32)
             # theta_rl = tf.get_variable('theta_rl', (), dtype=tf.float32)
             # total_loss = (1 / (2 * theta_ce * theta_ce)) * total_loss + (1 / (2 * theta_rl * theta_rl)) * \
@@ -1705,13 +1705,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
-            # total_loss += regression_loss * 0.5
-            theta_ce = tf.get_variable('theta_ce', (), dtype=tf.float32)
-            theta_rl = tf.get_variable('theta_rl', (), dtype=tf.float32)
-            theta_ans = tf.get_variable('theta_ans', (), dtype=tf.float32)
-            total_loss = (1 / (3 * theta_ce * theta_ce)) * loss_ce + (1 / (3 * theta_rl * theta_rl)) * loss_rl + (
-                    1 / (3 * theta_ans * theta_ans)) * regression_loss + tf.log(theta_ce * theta_ce) + tf.log(
-                theta_rl * theta_rl) + tf.log(theta_ans * theta_ans)
+            total_loss += regression_loss * 0.5
+            # theta_ce = tf.get_variable('theta_ce', (), dtype=tf.float32)
+            # theta_rl = tf.get_variable('theta_rl', (), dtype=tf.float32)
+            # theta_ans = tf.get_variable('theta_ans', (), dtype=tf.float32)
+            # total_loss = (1 / (3 * theta_ce * theta_ce)) * loss_ce + (1 / (3 * theta_rl * theta_rl)) * loss_rl + (
+            #         1 / (3 * theta_ans * theta_ans)) * regression_loss + tf.log(theta_ce * theta_ce) + tf.log(
+            #     theta_rl * theta_rl) + tf.log(theta_ans * theta_ans)
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
