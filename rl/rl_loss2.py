@@ -93,7 +93,7 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     guess_start = tf.reshape(guess_start, [-1])  # (bs * simple_num ,)
     guess_end = tf.reshape(guess_end, [-1])
     r = tf.reshape(r, [-1])
-
+    print(start_logits.shape)
     start_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(start_logits, bsz)], axis=0)
     end_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(end_logits, bsz)], axis=0)
 
