@@ -80,6 +80,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
     r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
+    r = tf.transpose(r)
     return r  # [bs, sample_num]
 
 
@@ -123,7 +124,6 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_end_sample = tf.multinomial(end_logits, sample_num)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
-    print(r.shape)
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample, guess_end_sample, r, sample_num)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
