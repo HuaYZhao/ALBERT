@@ -81,7 +81,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
     r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
-    return tf.reduce_mean(r, axis=-1)  # [bs, 1]
+    return r  # [bs, sample_num]
 
 
 def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num):
@@ -128,7 +128,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
-    loss = surr_loss + tf.stop_gradient(-r - surr_loss)
+    loss = surr_loss + tf.stop_gradient(-tf.reduce_mean(r, axis=-1) - surr_loss)
     print("loss_shape", loss.shape)
 
     cond_loss = tf.where(em, tf.zeros_like(loss), loss)  # 只有预测错误的才做rl
