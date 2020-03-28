@@ -123,6 +123,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_end_sample = tf.multinomial(end_logits, sample_num)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
+    print(r.shape)
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample, guess_end_sample, r, sample_num)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
