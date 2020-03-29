@@ -133,42 +133,6 @@ def simple_replace_with_null_odds():
           f"best_threshold: {best_threshold}")
 
 
-def prob_statistic_with_nbest():
-    y = list(no_answer_prediction.values())
-    exact_scores, f1_scores = get_raw_scores(dev, prediction)
-    best_exact = sum(exact_scores.values()) / len(exact_scores)
-    best_f1 = sum(f1_scores.values()) / len(f1_scores)
-    best_threshold1 = None
-    best_threshold2 = None
-    best_merge_prediction = None
-
-    def merge_with_nbest_prob(threshold1=0.5, threshold2=0.5):
-        merge_prediction = deepcopy(prediction)
-        for q_ids, answers in nbest_predictions.items():
-            nbest_answer = sorted(answers, key=lambda o: o["probability"])[-1]
-            if no_answer_prediction[q_ids] > threshold1 and nbest_answer["probability"] < threshold2:
-                merge_prediction[q_ids] = ''
-        return merge_prediction
-
-    for threshold1 in np.arange(1.26, 1.27, 0.01):
-        for threshold2 in np.arange(-1., 2., 0.1):
-            merge_prediction = merge_with_nbest_prob(threshold1, threshold2)
-            exact_scores, f1_scores = get_raw_scores(dev, merge_prediction)
-            exact = sum(exact_scores.values()) / len(exact_scores)
-            f1 = sum(f1_scores.values()) / len(f1_scores)
-            print(threshold1, threshold2, exact, f1, (exact + f1) / 2)
-
-            if exact + f1 > best_exact + best_f1:
-                best_exact = exact
-                best_f1 = f1
-                best_threshold1 = threshold1
-                best_threshold2 = threshold2
-                best_merge_prediction = deepcopy(merge_prediction)
-
-    json.dump(best_merge_prediction, open(merge_prediction_file, 'w', encoding='utf-8'), indent=4)
-    print(f"best_threshold: {best_threshold1} {best_threshold2}")
-
-
 xargs = "python ./data/eval.py ./data/dev-v2.0.json ./data/predictions.json"
 os.system(xargs)
 
