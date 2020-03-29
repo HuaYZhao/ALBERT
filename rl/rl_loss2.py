@@ -67,6 +67,20 @@ def greedy_search_end_with_start(sps, els):
     return end_greedy
 
 
+def greedy_sample_with_logits(sls, els):
+    """
+    sls: start logits
+    els: end logits
+    """
+    max_seq_len = tf.shape(sls)[1]
+    start_sample = tf.multinomial(sls, 1)
+    sps_mask = tf.sequence_mask(start_sample - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
+    els = els + -100000. * sps_mask
+    end_sample = tf.multinomial(els, 1)
+
+    return start_sample, end_sample
+
+
 def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_num):
     """
     Reinforcement learning reward (i.e. F1 score) from sampling a trajectory of guesses across each decoder timestep
@@ -120,8 +134,15 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
     has_no_answer = tf.logical_and(tf.equal(0, answer_start), tf.equal(0, answer_end))
 
-    guess_start_sample = tf.multinomial(start_logits, sample_num)
-    guess_end_sample = tf.multinomial(end_logits, sample_num)
+    guess_start_sample = []
+    guess_end_sample = []
+    for _ in range(sample_num):
+        start_sample, end_sample = greedy_sample_with_logits(start_logits, end_logits)
+        guess_start_sample.append(start_sample)
+        guess_end_sample.append(end_sample)
+
+    guess_start_sample = tf.concat(guess_start_sample, axis=1)
+    guess_end_sample = tf.concat(guess_end_sample, axis=1)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
     surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample, guess_end_sample, r, sample_num)
