@@ -49,7 +49,7 @@ def simple_tf_f1_score(tensors):
                      lambda: overlap / (ground_truth_end - ground_truth_start + 1))
 
     f1 = (2 * precision * recall) / (precision + recall)
-    return f1 / 100
+    return f1
 
 
 def greedy_search_end_with_start(sps, els):
