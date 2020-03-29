@@ -74,10 +74,8 @@ def greedy_sample_with_logits(sls, els):
     """
     max_seq_len = tf.shape(sls)[1]
     start_sample = tf.multinomial(sls, 1)
-    sps_mask = tf.sequence_mask(start_sample - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
-    print(els.shape)
+    sps_mask = tf.sequence_mask(tf.squeeze(start_sample) - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
     els = els + -100000. * sps_mask
-    print(els.shape)
     end_sample = tf.multinomial(els, 1)
 
     return start_sample, end_sample
