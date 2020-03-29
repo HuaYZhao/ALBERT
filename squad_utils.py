@@ -1681,7 +1681,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #                              project_layers_num=1, sample_num=4)
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
-                              features["start_positions"], features["end_positions"], sample_num=4)
+                              features["start_positions"], features["end_positions"], sample_num=2)
 
             total_loss += loss_rl * 0.5
             # theta_ce = tf.get_variable('theta_ce', (), dtype=tf.float32)
