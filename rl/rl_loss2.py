@@ -58,7 +58,7 @@ def greedy_search_end_with_start(sps, els):
     els: end logits
     """
     max_seq_len = tf.shape(els)[1]
-    sps_mask = tf.sequence_mask(sps, maxlen=max_seq_len, dtype=tf.float32)
+    sps_mask = tf.sequence_mask(sps - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
     els = els + -100000. * sps_mask
     sort_ids = tf.argsort(els, axis=-1, direction="DESCENDING")
 
