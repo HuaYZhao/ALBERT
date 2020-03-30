@@ -1692,8 +1692,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #                      lambda: total_loss + 0.1 * loss_rl,
             #                      lambda: total_loss)
 
-            tf.summary.scalar('loss', total_loss)
-
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
