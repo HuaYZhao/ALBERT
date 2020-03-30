@@ -59,7 +59,7 @@ def greedy_search_end_with_start(sps, els):
     """
     max_seq_len = tf.shape(els)[1]
     sps_mask = tf.sequence_mask(sps - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
-    els = els + -100000. * sps_mask
+    els = els - 1e30 * sps_mask
     sort_ids = tf.argsort(els, axis=-1, direction="DESCENDING")
 
     end_greedy = tf.cast(sort_ids[:, 0], tf.int32)
@@ -75,7 +75,7 @@ def greedy_sample_with_logits(sls, els):
     max_seq_len = tf.shape(sls)[1]
     start_sample = tf.multinomial(sls, 1)
     sps_mask = tf.sequence_mask(tf.squeeze(start_sample) - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
-    els = els + -100000. * sps_mask
+    els = els - 1e30 * sps_mask
     end_sample = tf.multinomial(els, 1)
 
     return start_sample, end_sample
@@ -102,7 +102,7 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     """
     The surrogate loss to be used for policy gradient updates
     """
-    bsz = start_logits.shape.as_list()[0]
+    bsz, seq_length = start_logits.shape.as_list()
 
     guess_start = tf.reshape(guess_start, [-1])  # (bs * simple_num ,)
     guess_end = tf.reshape(guess_end, [-1])
@@ -110,12 +110,14 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     start_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(start_logits, bsz)], axis=0)
     end_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(end_logits, bsz)], axis=0)
 
-    start_loss = r * \
-                 tf.nn.sparse_softmax_cross_entropy_with_logits(
-                     logits=start_logits, labels=guess_start)
-    end_loss = r * \
-               tf.nn.sparse_softmax_cross_entropy_with_logits(
-                   logits=end_logits, labels=guess_end)
+    def compute_loss(log_probs, positions):
+        one_hot_positions = tf.one_hot(
+            positions, depth=seq_length, dtype=tf.float32)
+
+        return - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
+
+    start_loss = r * compute_loss(start_logits, guess_start)
+    end_loss = r * compute_loss(end_logits, guess_end)
     start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
     end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
     loss = tf.reduce_mean(start_loss + end_loss, axis=1)
@@ -130,9 +132,9 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
 
     end_log_probs = tf.nn.log_softmax(end_logits, -1)
 
-    guess_start_greedy = tf.argmax(start_log_probs, axis=1, output_type=tf.int32)
+    guess_start_greedy = tf.argmax(start_logits, axis=1, output_type=tf.int32)
 
-    guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_log_probs)
+    guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_logits)
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
                                                  answer_start, answer_end), dtype=tf.float32)
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
@@ -141,7 +143,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_start_sample = []
     guess_end_sample = []
     for _ in range(sample_num):
-        start_sample, end_sample = greedy_sample_with_logits(start_log_probs, end_log_probs)
+        start_sample, end_sample = greedy_sample_with_logits(start_logits, end_logits)
         guess_start_sample.append(start_sample)
         guess_end_sample.append(end_sample)
 
@@ -149,7 +151,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_end_sample = tf.concat(guess_end_sample, axis=1)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
-    surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample,
+    surr_loss = surrogate_loss(start_log_probs, end_log_probs, guess_start_sample,
                                guess_end_sample, r, sample_num)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
