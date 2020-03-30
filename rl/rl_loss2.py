@@ -126,9 +126,13 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
-    guess_start_greedy = tf.argmax(start_logits, axis=1, output_type=tf.int32)
+    start_log_probs = tf.nn.log_softmax(start_logits, -1)
 
-    guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_logits)
+    end_log_probs = tf.nn.log_softmax(end_logits, -1)
+
+    guess_start_greedy = tf.argmax(start_log_probs, axis=1, output_type=tf.int32)
+
+    guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_log_probs)
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
                                                  answer_start, answer_end), dtype=tf.float32)
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
@@ -137,7 +141,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_start_sample = []
     guess_end_sample = []
     for _ in range(sample_num):
-        start_sample, end_sample = greedy_sample_with_logits(start_logits, end_logits)
+        start_sample, end_sample = greedy_sample_with_logits(start_log_probs, end_log_probs)
         guess_start_sample.append(start_sample)
         guess_end_sample.append(end_sample)
 
@@ -145,7 +149,8 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_end_sample = tf.concat(guess_end_sample, axis=1)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
-    surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample, guess_end_sample, r, sample_num)
+    surr_loss = surrogate_loss(start_logits, end_logits, guess_start_sample,
+                               guess_end_sample, r, sample_num)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
