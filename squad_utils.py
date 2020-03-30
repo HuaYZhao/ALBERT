@@ -1679,18 +1679,19 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 labels=tf.cast(is_impossible, dtype=tf.float32), logits=cls_logits)
             regression_loss = tf.reduce_mean(regression_loss)
 
+            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
+            # comparable to start_loss and end_loss
+            total_loss += regression_loss * 0.5
+
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
             # total_loss += 0.1 * loss_rl
             total_loss = tf.cond(tf.equal(tf.train.get_or_create_global_step() % 10, 9),
-                                 lambda: total_loss + 0.5 * loss_rl,
+                                 lambda: total_loss + 0.1 * loss_rl,
                                  lambda: total_loss)
 
-            # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
-            # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
