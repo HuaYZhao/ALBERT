@@ -93,8 +93,8 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
             dtype=tf.float32)  # [bs,]
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
-    r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
-    r = tf.transpose(r)
+    # r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
+    r = tf.transpose(reward)
     return r  # [bs, sample_num]
 
 
