@@ -1687,10 +1687,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
-            theta_ce = tf.get_variable('theta_ce', (), tf.float32)
-            theta_rl = tf.get_variable('theta_rl', (), tf.float32)
-            total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
-                          loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            theta_ce = tf.get_variable('theta_ce', tf.float32, initializer=tf.constant([1.]))
+            theta_rl = tf.get_variable('theta_rl', tf.float32, initializer=tf.constant([1.]))
+            total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
+                          tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
             train_op = optimization.create_optimizer(
