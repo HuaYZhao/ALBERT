@@ -1711,6 +1711,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             ner_labels = build_y()
             ner_loss = tf.keras.losses.sparse_categorical_crossentropy(ner_labels, ner_log_probs, from_logits=False)
+            ner_loss = tf.reduce_mean(ner_loss)
 
             total_loss += ner_loss * 0.5
 
