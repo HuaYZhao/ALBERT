@@ -1548,6 +1548,8 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
     if is_training:
         return_dict["start_log_probs"] = start_log_probs
         return_dict["end_log_probs"] = end_log_probs
+        return_dict["start_logits"] = start_logits_masked
+        return_dict["end_logits"] = end_logits_masked
     else:
         return_dict["start_top_log_probs"] = start_top_log_probs
         return_dict["start_top_index"] = start_top_index
@@ -1664,12 +1666,31 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(loss)
                 return loss
 
-            start_loss = compute_loss(
+            def focal_loss(pred, y, alpha=0.75, gamma=2):
+                y = tf.one_hot(y, depth=seq_length, dtype=tf.float32)
+
+                zeros = tf.zeros_like(pred, dtype=pred.dtype)
+
+                # For positive prediction, only need consider front part loss, back part is 0;
+                # target_tensor > zeros <=> z=1, so positive coefficient = z - p.
+                pos_p_sub = tf.where(y > zeros, y - pred, zeros)  # positive sample 寻找正样本，并进行填充
+
+                # For negative prediction, only need consider back part loss, front part is 0;
+                # target_tensor > zeros <=> z=1, so negative coefficient = 0.
+                neg_p_sub = tf.where(y > zeros, zeros, pred)  # negative sample 寻找负样本，并进行填充
+                per_entry_cross_ent = - alpha * tf.pow(pos_p_sub, gamma) * tf.log(tf.clip_by_value(pred, 1e-30, 1.0)) \
+                                      - (1 - alpha) * tf.pow(neg_p_sub, gamma) * tf.log(
+                    tf.clip_by_value(1.0 - pred, 1e-30, 1.0))
+
+                loss = tf.reduce_mean(tf.reduce_sum(per_entry_cross_ent, axis=-1))
+                return loss
+
+            start_loss = focal_loss(
                 outputs["start_log_probs"], features["start_positions"])
-            end_loss = compute_loss(
+            end_loss = focal_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            loss_ce = start_loss + end_loss
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -1679,7 +1700,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
+            total_loss = regression_loss * 0.5
+
+            from rl.rl_loss2 import rl_loss, cross_entropy_loss
+
+            loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
+                              features["start_positions"], features["end_positions"], sample_num=4)
+            theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(1.))
+            theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(1.))
+            total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
+                          tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
 
