@@ -116,11 +116,17 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
 
         return - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
 
-    start_loss = r * compute_loss(start_logits, guess_start)
-    end_loss = r * compute_loss(end_logits, guess_end)
-    start_loss = tf.stack(tf.split(start_loss, sample_num), axis=1)
-    end_loss = tf.stack(tf.split(end_loss, sample_num), axis=1)
-    loss = tf.reduce_mean(start_loss + end_loss, axis=1)
+    start_loss = compute_loss(start_logits, guess_start)
+    end_loss = compute_loss(end_logits, guess_end)
+
+    loss = start_loss + end_loss
+    loss = tf.where(tf.greater(r, 0), loss, tf.zeros_like(loss))
+    r = tf.where(tf.greater(r, 0), r, tf.zeros_like(r))  # 防止溢出
+    r = 2 * tf.sigmoid(r) - 1.
+    loss = r * loss
+
+    loss = tf.stack(tf.split(loss, sample_num), axis=1)
+    loss = tf.reduce_mean(loss, axis=1)
     return loss
 
 

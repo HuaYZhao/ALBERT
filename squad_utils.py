@@ -1687,7 +1687,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
-            total_loss += 0.1 * loss_rl
+            total_loss += 0.3 * loss_rl
             # total_loss = tf.cond(tf.equal(tf.train.get_or_create_global_step() % 10, 9),
             #                      lambda: total_loss + 0.1 * loss_rl,
             #                      lambda: total_loss)
