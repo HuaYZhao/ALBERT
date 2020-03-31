@@ -143,7 +143,7 @@ flags.DEFINE_integer(
     "nbest_predictions.json output file.")
 
 flags.DEFINE_integer(
-    "max_answer_length", 30,
+    "max_answer_length", 40,
     "The maximum length of an answer that can be generated. This is needed "
     "because the start and end predictions are not conditioned on one another.")
 
