@@ -1460,10 +1460,22 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 
     bsz = tf.shape(output)[0]
     return_dict = {}
-    output = tf.transpose(output, [1, 0, 2])
-
     # invalid position mask such as query and special symbols (PAD, SEP, CLS)
     p_mask = tf.cast(features["p_mask"], dtype=tf.float32)
+
+    with tf.variable_scope("ner_logits"):
+        ner_logits = tf.layers.dense(
+            output,
+            5,
+            kernel_initializer=modeling.create_initializer(
+                albert_config.initializer_range))
+        ep_mask = tf.expand_dims(p_mask, -1)
+        ner_logits_mask = ner_logits * (1 - ep_mask) - 1e30 * ep_mask
+        ner_log_probs = tf.nn.log_softmax(ner_logits_mask, -1)
+
+        return_dict["ner_log_probs"] = ner_log_probs
+
+    output = tf.transpose(output, [1, 0, 2])
 
     # logit of the start position
     with tf.variable_scope("start_logits"):
@@ -1654,7 +1666,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
-            seq_length = modeling.get_shape_list(input_ids)[1]
+            bsz, seq_length = modeling.get_shape_list(input_ids)
 
             def compute_loss(log_probs, positions):
                 one_hot_positions = tf.one_hot(
@@ -1680,6 +1692,28 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
             total_loss += regression_loss * 0.5
+
+            ner_log_probs = outputs["ner_log_probs"]
+
+            def build_y():
+                sequence_label = tf.zeros([bsz, seq_length], dtype=tf.int32)
+                basic_ones = tf.ones([bsz, seq_length], dtype=tf.int32)
+                start_y = tf.one_hot(features["start_positions"], depth=seq_length, dtype=tf.int32)
+                end_y = tf.one_hot(features["end_positions"], depth=seq_length, dtype=tf.int32)
+                sequence_label += start_y * basic_ones * 1 + end_y * basic_ones * 3
+                idxes = tf.tile(tf.expand_dims(tf.range(seq_length), 0), [bsz, 1])
+                sequence_label = tf.where(
+                    tf.logical_and(idxes > tf.tile(tf.expand_dims(features["start_positions"], 1), [1, seq_length])
+                                   , idxes < tf.tile(tf.expand_dims(features["end_positions"], 1), [1, seq_length])),
+                    basic_ones * 2,
+                    sequence_label)
+                return sequence_label
+
+            ner_labels = build_y()
+            ner_loss = tf.keras.losses.sparse_categorical_crossentropy(ner_labels, ner_log_probs, from_logits=False)
+
+            total_loss += ner_loss * 0.5
+
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
