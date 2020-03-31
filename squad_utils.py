@@ -1671,7 +1671,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             end_loss = compute_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
-            total_loss = (start_loss + end_loss) * 0.5
+            loss_ce = start_loss + end_loss
 
             cls_logits = outputs["cls_logits"]
             is_impossible = tf.reshape(features["is_impossible"], [-1])
@@ -1681,16 +1681,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
-            total_loss += regression_loss * 0.5
+            total_loss = regression_loss * 0.5
 
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
-            total_loss += 0.3 * loss_rl
-            # total_loss = tf.cond(tf.equal(tf.train.get_or_create_global_step() % 10, 9),
-            #                      lambda: total_loss + 0.1 * loss_rl,
-            #                      lambda: total_loss)
+            theta_ce = tf.get_variable('theta_ce', (), tf.float32)
+            theta_rl = tf.get_variable('theta_rl', (), tf.float32)
+            total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * \
+                          loss_rl + tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
