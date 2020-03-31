@@ -1713,7 +1713,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             ner_loss = tf.keras.losses.sparse_categorical_crossentropy(ner_labels, ner_log_probs, from_logits=False)
             ner_loss = tf.reduce_mean(ner_loss)
 
-            total_loss += ner_loss * 0.5
+            total_loss += ner_loss * 0.2
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
