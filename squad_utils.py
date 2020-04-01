@@ -1714,7 +1714,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                          lambda: 2e-5)
 
             train_op = optimization.create_optimizer(
-                train_loss, lr, train_steps, warmup_steps, use_tpu)
+                train_loss, learning_rate, train_steps, warmup_steps, use_tpu)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
