@@ -1694,11 +1694,16 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             #               tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
             qa_num_train_steps = int(epoch_steps * 2)
+            qa_warmup_steps = int(qa_num_train_steps * 0.1)
             rl_num_train_steps = int(num_train_steps - qa_num_train_steps)
+            rl_warmup_steps = int(rl_num_train_steps * 0.1)
 
             train_steps = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                   lambda: qa_num_train_steps,
                                   lambda: rl_num_train_steps)
+            warmup_steps = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                                   lambda: qa_warmup_steps,
+                                   lambda: rl_warmup_steps)
 
             train_loss = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                  lambda: total_loss,
@@ -1709,7 +1714,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                          lambda: 2e-5)
 
             train_op = optimization.create_optimizer(
-                train_loss, lr, train_steps, int(train_steps * 0.1), use_tpu)
+                train_loss, lr, train_steps, warmup_steps, use_tpu)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
