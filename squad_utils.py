@@ -1693,16 +1693,17 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
             #               tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
-            qa_num_train_steps = epoch_steps * 2
-            qa_num_warmup_steps = int(qa_num_train_steps * 0.1)
+            with tf.variable_scope("optimize", reuse=tf.AUTO_REUSE):
+                qa_num_train_steps = epoch_steps * 2
+                qa_num_warmup_steps = int(qa_num_train_steps * 0.1)
 
-            qa_train_op = optimization.create_optimizer(
-                total_loss, learning_rate, qa_num_train_steps, qa_num_warmup_steps, use_tpu)
+                qa_train_op = optimization.create_optimizer(
+                    total_loss, learning_rate, qa_num_train_steps, qa_num_warmup_steps, use_tpu)
 
-            rl_num_train_steps = num_train_steps - qa_num_train_steps
-            rl_num_warmup_steps = int(rl_num_train_steps * 0.1)
-            rl_train_op = optimization.create_optimizer(
-                loss_rl, 2e-5, rl_num_train_steps, rl_num_warmup_steps, use_tpu)
+                rl_num_train_steps = num_train_steps - qa_num_train_steps
+                rl_num_warmup_steps = int(rl_num_train_steps * 0.1)
+                rl_train_op = optimization.create_optimizer(
+                    loss_rl, 2e-5, rl_num_train_steps, rl_num_warmup_steps, use_tpu)
 
             train_op = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                lambda: qa_train_op,
