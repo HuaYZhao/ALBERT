@@ -121,8 +121,8 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
 
     loss = start_loss + end_loss
     loss = tf.where(tf.greater(r, 0), loss, tf.zeros_like(loss))
-    r = tf.where(tf.greater(r, 0), r, tf.zeros_like(r))  # 防止溢出
-    r = 2 * tf.sigmoid(r) - 1.
+    # r = tf.where(tf.greater(r, 0), r, tf.zeros_like(r))  # 防止溢出
+    # r = 2 * tf.sigmoid(r) - 1.
     loss = r * loss
 
     loss = tf.stack(tf.split(loss, sample_num), axis=1)

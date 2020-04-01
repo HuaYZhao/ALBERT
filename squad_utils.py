@@ -1598,8 +1598,9 @@ def create_v2_model(albert_config, is_training, input_ids, input_mask,
 def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                         num_train_steps, num_warmup_steps, use_tpu,
                         use_one_hot_embeddings, max_seq_length, start_n_top,
-                        end_n_top, dropout_prob, hub_module):
+                        end_n_top, dropout_prob, hub_module, train_epoch):
     """Returns `model_fn` closure for TPUEstimator."""
+    epoch_steps = num_train_steps / train_epoch
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
         """The `model_fn` for TPUEstimator."""
@@ -1681,20 +1682,31 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             # note(zhiliny): by default multiply the loss by 0.5 so that the scale is
             # comparable to start_loss and end_loss
-            total_loss = regression_loss * 0.5
+            total_loss = regression_loss * 0.5 + loss_ce * 0.5
 
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
 
             loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                               features["start_positions"], features["end_positions"], sample_num=4)
-            theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(1.))
-            theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(1.))
-            total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
-                          tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
+            # theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(1.))
+            # theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(1.))
+            # total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
+            #               tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
+            qa_num_train_steps = epoch_steps * 2
+            qa_num_warmup_steps = num_train_steps * 0.1
 
-            train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+            qa_train_op = optimization.create_optimizer(
+                total_loss, learning_rate, qa_num_train_steps, qa_num_warmup_steps, use_tpu)
+
+            rl_num_train_steps = num_train_steps - qa_num_train_steps
+            rl_num_warmup_steps = rl_num_train_steps * 0.1
+            rl_train_op = optimization.create_optimizer(
+                loss_rl, 2e-5, rl_num_train_steps, rl_num_warmup_steps, use_tpu)
+
+            train_op = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                               lambda: qa_train_op,
+                               lambda: rl_train_op)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
