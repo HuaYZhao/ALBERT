@@ -1698,12 +1698,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             rl_num_train_steps = int(num_train_steps - qa_num_train_steps)
             rl_warmup_steps = int(rl_num_train_steps * 0.1)
 
-            train_steps = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                  lambda: qa_num_train_steps,
-                                  lambda: rl_num_train_steps)
-            warmup_steps = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                   lambda: qa_warmup_steps,
-                                   lambda: rl_warmup_steps)
+            train_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                                          lambda: qa_num_train_steps,
+                                          lambda: rl_num_train_steps), tf.int32)
+            warmup_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                                           lambda: qa_warmup_steps,
+                                           lambda: rl_warmup_steps), tf.int32)
 
             train_loss = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                  lambda: total_loss,
