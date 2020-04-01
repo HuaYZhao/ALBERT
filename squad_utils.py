@@ -1700,10 +1700,10 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             train_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                           lambda: qa_num_train_steps,
-                                          lambda: rl_num_train_steps), tf.int32)
+                                          lambda: rl_num_train_steps), tf.float32)
             warmup_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                            lambda: qa_warmup_steps,
-                                           lambda: rl_warmup_steps), tf.int32)
+                                           lambda: rl_warmup_steps), tf.float32)
 
             train_loss = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
                                  lambda: total_loss,
