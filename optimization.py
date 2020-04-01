@@ -28,17 +28,16 @@ from tensorflow.contrib import tpu as contrib_tpu
 
 def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
                      optimizer="adamw", poly_power=1.0, start_warmup_step=0,
-                     colocate_gradients_with_ops=False, modify_global_step=None):
+                     colocate_gradients_with_ops=False):
     """Creates an optimizer training op."""
     global_step = tf.train.get_or_create_global_step()
 
-    # learning_rate = tf.constant(value=init_lr, shape=[], dtype=tf.float32)
-    learning_rate = tf.cast(init_lr, tf.float32)
+    learning_rate = tf.constant(value=init_lr, shape=[], dtype=tf.float32)
 
     # Implements linear decay of the learning rate.
     learning_rate = tf.train.polynomial_decay(
         learning_rate,
-        modify_global_step,
+        global_step,
         num_train_steps,
         end_learning_rate=0.0,
         power=poly_power,
@@ -50,7 +49,7 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # if num_warmup_steps:
     # tf.logging.info("++++++ warmup starts at step " + str(start_warmup_step)
     #                 + ", for " + str(num_warmup_steps) + " steps ++++++")
-    global_steps_int = tf.cast(modify_global_step, tf.int32)
+    global_steps_int = tf.cast(global_step, tf.int32)
     start_warm_int = tf.constant(start_warmup_step, dtype=tf.int32)
     global_steps_int = global_steps_int - start_warm_int
     warmup_steps_int = tf.cast(num_warmup_steps, dtype=tf.int32)

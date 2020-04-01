@@ -1693,36 +1693,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
             #               tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             # total_loss = 0.5 * loss_ce + 0.5 * loss_rl
-            qa_num_train_steps = int(epoch_steps * 2)
-            qa_warmup_steps = int(qa_num_train_steps * 0.1)
-            rl_num_train_steps = int(num_train_steps - qa_num_train_steps)
-            rl_warmup_steps = int(rl_num_train_steps * 0.1)
-
-            train_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                          lambda: qa_num_train_steps,
-                                          lambda: rl_num_train_steps), tf.float32)
-            warmup_steps = tf.cast(tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                           lambda: qa_warmup_steps,
-                                           lambda: rl_warmup_steps), tf.float32)
-
-            train_loss = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                 lambda: total_loss,
-                                 lambda: loss_rl)
-
-            lr = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                         lambda: learning_rate,
-                         lambda: 2e-5)
-
-            global_step = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                                  lambda: tf.train.get_or_create_global_step(),
-                                  lambda: tf.train.get_or_create_global_step() - qa_num_train_steps)
 
             train_op = optimization.create_optimizer(
-                train_loss, learning_rate, train_steps, warmup_steps, use_tpu, modify_global_step=global_step)
+                loss_rl, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
-                loss=train_loss,
+                loss=loss_rl,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
