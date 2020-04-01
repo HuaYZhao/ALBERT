@@ -1713,8 +1713,12 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                          lambda: learning_rate,
                          lambda: 2e-5)
 
+            global_step = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                                  lambda: tf.train.get_or_create_global_step(),
+                                  lambda: tf.train.get_or_create_global_step() - qa_num_train_steps)
+
             train_op = optimization.create_optimizer(
-                train_loss, learning_rate, train_steps, warmup_steps, use_tpu)
+                train_loss, learning_rate, train_steps, warmup_steps, use_tpu, modify_global_step=global_step)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
