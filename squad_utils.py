@@ -1712,7 +1712,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
                           tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adamw")
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu, optimizer="adafactor")
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
