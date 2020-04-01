@@ -1685,9 +1685,9 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss = tf.reduce_mean(tf.reduce_sum(per_entry_cross_ent, axis=-1))
                 return loss
 
-            start_loss = focal_loss(
+            start_loss = compute_loss(
                 outputs["start_log_probs"], features["start_positions"])
-            end_loss = focal_loss(
+            end_loss = compute_loss(
                 outputs["end_log_probs"], features["end_positions"])
 
             loss_ce = start_loss + end_loss
