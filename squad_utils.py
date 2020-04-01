@@ -37,6 +37,7 @@ import tensorflow.compat.v1 as tf
 from tensorflow.contrib import data as contrib_data
 from tensorflow.contrib import layers as contrib_layers
 from tensorflow.contrib import tpu as contrib_tpu
+from tensorflow.python import debug as tf_debug
 
 _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
     "PrelimPrediction",
@@ -1697,11 +1698,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             train_op = optimization.create_optimizer(
                 loss_rl, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
+            debug_hook = tf_debug.LocalCLIDebugHook(ui_type='readline')
+
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=loss_rl,
                 train_op=train_op,
-                scaffold_fn=scaffold_fn)
+                scaffold_fn=scaffold_fn,
+                training_hooks=[debug_hook])
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
