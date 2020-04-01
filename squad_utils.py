@@ -1705,14 +1705,14 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 rl_train_op = optimization.create_optimizer(
                     loss_rl, 2e-5, rl_num_train_steps, rl_num_warmup_steps, use_tpu)
 
-            train_op = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
-                               lambda: qa_train_op,
-                               lambda: rl_train_op)
+                train_op = tf.cond(tf.less_equal(tf.train.get_or_create_global_step(), qa_num_train_steps),
+                                   lambda: qa_train_op,
+                                   lambda: rl_train_op)
 
             output_spec = contrib_tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
-                train_op=qa_train_op,
+                train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
