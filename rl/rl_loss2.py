@@ -134,6 +134,11 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
+    start_logits = tf.identity(start_logits, name="start_logits")
+    end_logits = tf.identity(end_logits, name="end_logits")
+    answer_start = tf.identity(answer_start, name="answer_start")
+    answer_end = tf.identity(answer_end, name="answer_end")
+
     start_log_probs = tf.nn.log_softmax(start_logits, -1)
 
     end_log_probs = tf.nn.log_softmax(end_logits, -1)
