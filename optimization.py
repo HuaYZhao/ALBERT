@@ -47,12 +47,12 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu,
     # num_warmup_steps, the learning rate will be
     # `(global_step - start_warmup_step)/num_warmup_steps * init_lr`.
     # if num_warmup_steps:
-    tf.logging.info("++++++ warmup starts at step " + str(start_warmup_step)
-                    + ", for " + str(num_warmup_steps) + " steps ++++++")
+    # tf.logging.info("++++++ warmup starts at step " + str(start_warmup_step)
+    #                 + ", for " + str(num_warmup_steps) + " steps ++++++")
     global_steps_int = tf.cast(global_step, tf.int32)
     start_warm_int = tf.constant(start_warmup_step, dtype=tf.int32)
     global_steps_int = global_steps_int - start_warm_int
-    warmup_steps_int = tf.constant(num_warmup_steps, dtype=tf.int32)
+    warmup_steps_int = tf.cast(num_warmup_steps, dtype=tf.int32)
 
     global_steps_float = tf.cast(global_steps_int, tf.float32)
     warmup_steps_float = tf.cast(warmup_steps_int, tf.float32)
