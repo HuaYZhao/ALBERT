@@ -162,7 +162,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
-    loss = surr_loss + tf.stop_gradient(-tf.reduce_mean(r, axis=-1) - surr_loss)
+    loss = surr_loss + tf.stop_gradient(-tf.reduce_mean(r + f1_baseline, axis=-1) - surr_loss)
 
     cond_loss = tf.where(tf.logical_or(em, has_no_answer), tf.zeros_like(loss), loss)  # 只有预测错误的才做rl
     return tf.reduce_mean(loss)
