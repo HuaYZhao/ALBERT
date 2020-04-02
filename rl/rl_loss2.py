@@ -134,8 +134,6 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
-    answer_start = tf.reshape(answer_start, [-1], name="answer_start")
-    answer_end = tf.reshape(answer_end, [-1], name="answer_end")
 
     start_log_probs = tf.nn.log_softmax(start_logits, -1)
 
@@ -158,6 +156,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
         guess_end_sample.append(end_sample)
 
     guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
+    guess_start_sample = tf.print(guess_start_sample)
     guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
