@@ -121,10 +121,10 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_star
         return - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
 
     start_loss = compute_loss(start_logits, guess_start)
-    start_r = tf.where(tf.equal(guess_start, answer_start), tf.ones_like(r) * 0.5, r, name="start_r")
+    start_r = tf.where(tf.equal(tf.cast(guess_start, tf.int32), answer_start), tf.ones_like(r) * 0.5, r, name="start_r")
     start_loss = start_r * start_loss
     end_loss = compute_loss(end_logits, guess_end)
-    end_r = tf.where(tf.equal(guess_end, answer_end), tf.ones_like(r) * 0.5, r, name="end_r")
+    end_r = tf.where(tf.equal(tf.cast(guess_end, tf.int32), answer_end), tf.ones_like(r) * 0.5, r, name="end_r")
     end_loss = end_r * end_loss
 
     loss = start_loss + end_loss
