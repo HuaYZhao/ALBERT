@@ -1,4 +1,5 @@
 import tensorflow as tf
+import sys
 from rl.utils import mask_to_start
 
 
@@ -156,7 +157,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
         guess_end_sample.append(end_sample)
 
     guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
-    tf.print(guess_start_sample)
+    tf.print(guess_start_sample, output_stream=sys.stdout)
     guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
