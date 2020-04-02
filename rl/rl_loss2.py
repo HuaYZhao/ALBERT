@@ -79,10 +79,10 @@ def greedy_sample_with_logits(sls, els):
     els: end logits
     """
     max_seq_len = tf.shape(sls)[1]
-    start_sample = tf.multinomial(sls, 1)
+    start_sample = tf.multinomial(sls, 1, dtype=tf.int32)
     sps_mask = tf.sequence_mask(tf.squeeze(start_sample) - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
     els = els * (1 - sps_mask) - 1e30 * sps_mask
-    end_sample = tf.multinomial(els, 1)
+    end_sample = tf.multinomial(els, 1, dtype=tf.int32)
 
     return start_sample, end_sample
 
@@ -126,10 +126,10 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_star
         return - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
 
     start_loss = compute_loss(start_logits, guess_start)
-    start_r = tf.where(tf.equal(tf.cast(guess_start, tf.int32), answer_start), tf.ones_like(r) * 0.5, r, name="start_r")
+    start_r = tf.where(tf.equal(guess_start, answer_start), tf.ones_like(r) * 0.5, r, name="start_r")
     start_loss = start_r * start_loss
     end_loss = compute_loss(end_logits, guess_end)
-    end_r = tf.where(tf.equal(tf.cast(guess_end, tf.int32), answer_end), tf.ones_like(r) * 0.5, r, name="end_r")
+    end_r = tf.where(tf.equal(guess_end, answer_end), tf.ones_like(r) * 0.5, r, name="end_r")
     end_loss = end_r * end_loss
 
     loss = start_loss + end_loss
@@ -152,7 +152,7 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_logits)
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
                                                  answer_start, answer_end), dtype=tf.float32)
-    f1_baseline = tf.reshape(f1_baseline, [-1], name="f1_baseline")
+    # f1_baseline = tf.reshape(f1_baseline, [-1], name="f1_baseline")
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
     has_no_answer = tf.logical_and(tf.equal(0, answer_start), tf.equal(0, answer_end))
 
