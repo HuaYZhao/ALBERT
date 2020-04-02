@@ -94,7 +94,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
         normalized_reward = tf.stop_gradient(f1_score - baseline)
         reward[t] = normalized_reward
     # r = 2 * tf.sigmoid(reward) - 1  # 分布变换，保留正负
-    r = tf.transpose(reward)
+    r = tf.transpose(reward, name="reward")
     return r  # [bs, sample_num]
 
 
@@ -125,7 +125,7 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     # r = 2 * tf.sigmoid(r) - 1.
     loss = r * loss
 
-    loss = tf.stack(tf.split(loss, sample_num), axis=1)
+    loss = tf.stack(tf.split(loss, sample_num), axis=1, name="surrogate_loss")
     loss = tf.reduce_mean(loss, axis=1)
     return loss
 
@@ -153,8 +153,8 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
         guess_start_sample.append(start_sample)
         guess_end_sample.append(end_sample)
 
-    guess_start_sample = tf.concat(guess_start_sample, axis=1)
-    guess_end_sample = tf.concat(guess_end_sample, axis=1)
+    guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
+    guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
     surr_loss = surrogate_loss(start_log_probs, end_log_probs, guess_start_sample,
