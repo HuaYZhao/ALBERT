@@ -1688,7 +1688,6 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             from rl.rl_loss2 import rl_loss, cross_entropy_loss
 
             with tf.name_scope("rl"):
-                print(features["end_positions"].shape)
                 loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
                                   features["start_positions"], features["end_positions"], sample_num=4)
             # theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(1.))
