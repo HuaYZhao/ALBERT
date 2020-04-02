@@ -110,8 +110,9 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_star
     r = tf.reshape(r, [-1])
     start_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(start_logits, bsz)], axis=0)
     end_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(end_logits, bsz)], axis=0)
-    answer_start = tf.concat([tf.tile(_sp, [sample_num, ]) for _sp in tf.split(answer_start, bsz)], axis=0)
-    answer_end = tf.concat([tf.tile(_sp, [sample_num, ]) for _sp in tf.split(answer_end, bsz)], axis=0)
+    answer_start = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(answer_start, bsz)], axis=0)
+    answer_end = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(answer_end, bsz)], axis=0)
+    print(answer_start.shape)
 
     def compute_loss(log_probs, positions):
         one_hot_positions = tf.one_hot(
