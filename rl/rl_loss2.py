@@ -113,6 +113,7 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_star
     print(answer_start.shape)
     print(tf.split(answer_start, bsz)[0].shape)
     answer_start = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_start, bsz)], axis=0)
+    print(answer_end.shape)
     answer_end = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_end, bsz)], axis=0)
     print(answer_start.shape)
 
