@@ -111,11 +111,12 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_star
     start_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(start_logits, bsz)], axis=0)
     end_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(end_logits, bsz)], axis=0)
     print(answer_start.shape)
+    print(answer_end.shape)
+
     print(tf.split(answer_start, bsz)[0].shape)
     answer_start = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_start, bsz)], axis=0)
     print(answer_end.shape)
     answer_end = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_end, bsz)], axis=0)
-    print(answer_start.shape)
 
     def compute_loss(log_probs, positions):
         one_hot_positions = tf.one_hot(
@@ -141,7 +142,6 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
-    print(answer_end.shape)
     start_log_probs = tf.nn.log_softmax(start_logits, -1)
 
     end_log_probs = tf.nn.log_softmax(end_logits, -1)
@@ -164,7 +164,6 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
 
     guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
     guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
-    print(answer_end.shape)
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
     print(answer_end.shape)
