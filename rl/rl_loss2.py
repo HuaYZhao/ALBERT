@@ -134,6 +134,9 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     """
     Reinforcement learning loss
     """
+    answer_start = tf.reshape(answer_start, [-1], name="answer_start")
+    answer_end = tf.reshape(answer_end, [-1], name="answer_end")
+
     start_log_probs = tf.nn.log_softmax(start_logits, -1)
 
     end_log_probs = tf.nn.log_softmax(end_logits, -1)
@@ -142,7 +145,8 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
 
     guess_end_greedy = greedy_search_end_with_start(guess_start_greedy, end_logits)
     f1_baseline = tf.map_fn(simple_tf_f1_score, (guess_start_greedy, guess_end_greedy,
-                                                 answer_start, answer_end), dtype=tf.float32, name="f1_baseline")
+                                                 answer_start, answer_end), dtype=tf.float32)
+    f1_baseline = tf.reshape(f1_baseline, [-1], name="f1_baseline")
     em = tf.logical_and(tf.equal(guess_start_greedy, answer_start), tf.equal(guess_end_greedy, answer_end))
     has_no_answer = tf.logical_and(tf.equal(0, answer_start), tf.equal(0, answer_end))
 
