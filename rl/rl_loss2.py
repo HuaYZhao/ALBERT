@@ -156,9 +156,10 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
         guess_start_sample.append(start_sample)
         guess_end_sample.append(end_sample)
 
-    guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
-    tf.print(guess_start_sample, output_stream=sys.stdout)
-    guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
+    # guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
+    guess_start_sample = tf.reshape(guess_start_sample, [2, -1], name="guess_start_sample")
+    # guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
+    guess_end_sample = tf.reshape(guess_end_sample, [2, -1], name="guess_end_sample")
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
     surr_loss = surrogate_loss(start_log_probs, end_log_probs, guess_start_sample,
