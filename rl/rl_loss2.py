@@ -99,7 +99,7 @@ def reward(guess_start, guess_end, answer_start, answer_end, baseline, sample_nu
     return r  # [bs, sample_num]
 
 
-def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_num):
+def surrogate_loss(start_logits, end_logits, guess_start, guess_end, answer_start, answer_end, r, sample_num):
     """
     The surrogate loss to be used for policy gradient updates
     """
@@ -110,6 +110,8 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
     r = tf.reshape(r, [-1])
     start_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(start_logits, bsz)], axis=0)
     end_logits = tf.concat([tf.tile(_sp, [sample_num, 1]) for _sp in tf.split(end_logits, bsz)], axis=0)
+    answer_start = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_start, bsz)], axis=0)
+    answer_end = tf.concat([tf.tile(_sp, [sample_num]) for _sp in tf.split(answer_end, bsz)], axis=0)
 
     def compute_loss(log_probs, positions):
         one_hot_positions = tf.one_hot(
@@ -118,13 +120,13 @@ def surrogate_loss(start_logits, end_logits, guess_start, guess_end, r, sample_n
         return - tf.reduce_sum(one_hot_positions * log_probs, axis=-1)
 
     start_loss = compute_loss(start_logits, guess_start)
+    start_r = tf.where(tf.equal(guess_start, answer_start), tf.ones_like(r) * 0.5, r, name="start_r")
+    start_loss = start_r * start_loss
     end_loss = compute_loss(end_logits, guess_end)
+    end_r = tf.where(tf.equal(guess_end, answer_end), tf.ones_like(r) * 0.5, r, name="end_r")
+    end_loss = end_r * end_loss
 
     loss = start_loss + end_loss
-    # loss = tf.where(tf.greater(r, 0), loss, tf.zeros_like(loss))
-    # r = tf.where(tf.greater(r, 0), r, tf.zeros_like(r))  # 防止溢出
-    # r = 2 * tf.sigmoid(r) - 1.
-    loss = r * loss
 
     loss = tf.stack(tf.split(loss, sample_num), axis=1, name="surrogate_loss")
     loss = tf.reduce_mean(loss, axis=1)
@@ -156,13 +158,12 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
         guess_start_sample.append(start_sample)
         guess_end_sample.append(end_sample)
 
-    # guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
-    guess_start_sample = tf.reshape(guess_start_sample, [2, -1], name="guess_start_sample")
-    # guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
-    guess_end_sample = tf.reshape(guess_end_sample, [2, -1], name="guess_end_sample")
+    guess_start_sample = tf.concat(guess_start_sample, axis=1, name="guess_start_sample")
+    guess_end_sample = tf.concat(guess_end_sample, axis=1, name="guess_end_sample")
 
     r = reward(guess_start_sample, guess_end_sample, answer_start, answer_end, f1_baseline, sample_num)  # [bs,4]
     surr_loss = surrogate_loss(start_log_probs, end_log_probs, guess_start_sample,
+                               answer_start, answer_end,
                                guess_end_sample, r, sample_num)
 
     # This function needs to return the value of loss in the forward pass so that theta_rl gets the right parameter update

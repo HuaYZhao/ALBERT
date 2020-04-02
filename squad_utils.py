@@ -1689,7 +1689,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
 
             with tf.name_scope("rl"):
                 loss_rl = rl_loss(outputs["start_logits"], outputs["end_logits"],
-                                  features["start_positions"], features["end_positions"], sample_num=1)
+                                  features["start_positions"], features["end_positions"], sample_num=4)
             # theta_ce = tf.get_variable('theta_ce', dtype=tf.float32, initializer=lambda: tf.constant(1.))
             # theta_rl = tf.get_variable('theta_rl', dtype=tf.float32, initializer=lambda: tf.constant(1.))
             # total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
@@ -1706,7 +1706,8 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 loss=loss_rl,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn,
-                training_hooks=[debug_hook])
+                # training_hooks=[debug_hook]
+            )
         elif mode == tf.estimator.ModeKeys.PREDICT:
             predictions = {
                 "unique_ids": features["unique_ids"],
