@@ -177,5 +177,5 @@ def rl_loss(start_logits, end_logits, answer_start, answer_end, sample_num=1):
     # However, this needs to have the gradient of surr_loss in the backward pass so the model gets the right policy gradient update
     loss = surr_loss + tf.stop_gradient(1 - tf.reduce_mean(r + tf.expand_dims(f1_baseline, -1), axis=-1) - surr_loss)
 
-    cond_loss = tf.where(has_no_answer, tf.zeros_like(loss), loss)  # 只做有答案的
+    cond_loss = tf.where(tf.logical_and(em, has_no_answer), tf.zeros_like(loss), loss)  # 只做有答案的
     return tf.reduce_mean(cond_loss)
