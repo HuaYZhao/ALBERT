@@ -79,10 +79,10 @@ def greedy_sample_with_logits(sls, els):
     els: end logits
     """
     max_seq_len = tf.shape(sls)[1]
-    start_sample = tf.random.categorical(sls, 1, output_dtype=tf.int32)
+    start_sample = tf.random.categorical(sls, 1, dtype=tf.int32)
     sps_mask = tf.sequence_mask(tf.squeeze(start_sample) - 1, maxlen=max_seq_len, dtype=tf.float32)  # start end 是可以重复的
     els = els * (1 - sps_mask) - 1e30 * sps_mask
-    end_sample = tf.random.categorical(els, 1, output_dtype=tf.int32)
+    end_sample = tf.random.categorical(els, 1, dtype=tf.int32)
 
     return start_sample, end_sample
 
