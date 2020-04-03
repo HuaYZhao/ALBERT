@@ -1701,7 +1701,7 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
                 end_learning_rate=0.0,
                 power=1.,
                 cycle=False)
-            total_loss = 0.5 * loss_ce + (1 - alpha) * loss_rl + 0.5 * regression_loss
+            total_loss = 0.5 * loss_ce + (1 - alpha) * loss_rl +  regression_loss
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
