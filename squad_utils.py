@@ -1695,13 +1695,13 @@ def v2_model_fn_builder(albert_config, init_checkpoint, learning_rate,
             # total_loss += (1 / (2 * theta_ce * theta_ce)) * loss_ce + (1 / (2 * theta_rl * theta_rl)) * loss_rl + \
             #               tf.log(theta_ce * theta_ce) + tf.log(theta_rl * theta_rl)
             alpha = tf.train.polynomial_decay(
-                .5,
+                1.,
                 tf.train.get_or_create_global_step(),
                 num_train_steps,
                 end_learning_rate=0.0,
                 power=1.,
                 cycle=False)
-            total_loss = 0.5 * loss_ce + (1 - 2 * alpha) * loss_rl + (1 - alpha) * regression_loss
+            total_loss = 0.5 * loss_ce + (1 - alpha) * loss_rl + regression_loss
 
             train_op = optimization.create_optimizer(
                 total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
