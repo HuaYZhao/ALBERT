@@ -142,27 +142,31 @@ def simple_replace_with_null_odds():
 
 def check_data():
     dev_exact_scores, dev_f1_scores = get_raw_scores(dev, prediction)
-    train_exact_scores, train_f1_scores = get_raw_scores(train, train_preds)
+    # train_exact_scores, train_f1_scores = get_raw_scores(train, train_preds)
 
-    train_error_exact = seq(train_exact_scores.items()).filter(lambda x: x[1] == 0).map(lambda x: x[0]).list()
-    dev_error_exact = seq(dev_exact_scores.items()).filter(lambda x: x[1] == 0).map(lambda x: x[0]).list()
+    all_qas = []
+    plausible_qas = []
+    for article in dev:
+        for paragraph in article["paragraphs"]:
+            context = paragraph['context']
+            for qa in paragraph['qas']:
+                qa['context'] = context
+                all_qas.append(qa)
+                if 'plausible_answers' in qa:
+                    plausible_qas.append(qa)
 
-    all_dev_qas = seq(dev).map(lambda x: x['paragraphs']).flatten().list()
-    all_train_qas = seq(train).map(lambda x: x['paragraphs']).flatten().list()
+    error_plausible = (seq(plausible_qas)
+                       .filter(lambda x: dev_exact_scores[x['id']] == 0)
+                       .map(lambda x: dict(prediction=prediction[x['id']],
+                                           **x))
+                       ).list()
 
-    def find_id(id_, all_qas):
-        for qas in all_qas:
-            qa = seq(qas['qas']).filter(lambda x: x['id'] == id_).list()
-            if qa:
-                return dict(context=qas['context'],
-                            prediction=prediction.get(id_, None) or train_preds.get(id_, None),
-                            **qa[0])
-
-    dev_error_exact_qas = [find_id(id_, all_dev_qas) for id_ in dev_error_exact[:100]]
-    train_error_exact_qas = [find_id(id_, all_train_qas) for id_ in train_error_exact[:100]]
-
-    # x = seq(dev).map(lambda x: [x['title'], get_raw_scores([x], prediction)]).map(
-    #     lambda x: [x[0], np.mean(list(x[1][0].values())), np.mean(list(x[1][1].values()))]).list()
+    error = (seq(all_qas)
+             .filter(lambda x: dev_f1_scores[x['id']] == 0)
+             .map(lambda x: dict(prediction=prediction[x['id']],
+                                 **x))
+             .filter(lambda x: x['answers'])
+             ).list()
     print(1)
 
 
@@ -208,4 +212,4 @@ def write_answer_refine():
 # xargs = "python ./data/eval.py ./data/dev-v2.0.json ./data/merge_predictions.json"
 # os.system(xargs)
 # print(f"cost time: {time.time() - start}")
-write_answer_refine()
+check_data()
