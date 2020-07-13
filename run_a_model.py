@@ -19,26 +19,26 @@ def run_a_model(tpu_id, model_type, batch_size=32, max_seq_length=384, lr=2e-5, 
     spm_model_file = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/30k-clean.model"
 
     xargs = f"""
-            python3 run_squad_v2.py 
-              --albert_config_file={config_file} 
-              --output_dir={output_dir} 
-              --train_file={train_file} 
-              --predict_file={predict_file} 
-              --train_feature_file={train_feature_file} 
-              --predict_feature_file={predict_feature_file} 
-              --predict_feature_left_file={predict_feature_left_file} 
-              --init_checkpoint={init_checkpoint} 
-              --spm_model_file={spm_model_file} 
-              --max_seq_length={max_seq_length} 
-              --do_train=True
-              --do_predict=True
-              --train_batch_size={batch_size} 
-              --predict_batch_size=32 
-              --learning_rate={lr} 
-              --num_train_epochs={epoch} 
-              --save_checkpoints_steps=100000
-              --n_best_size=20
-              --use_tpu=True 
+            python3 run_squad_v2.py \
+              --albert_config_file={config_file} \
+              --output_dir={output_dir} \
+              --train_file={train_file} \
+              --predict_file={predict_file} \
+              --train_feature_file={train_feature_file} \
+              --predict_feature_file={predict_feature_file} \
+              --predict_feature_left_file={predict_feature_left_file} \
+              --init_checkpoint={init_checkpoint} \
+              --spm_model_file={spm_model_file} \
+              --max_seq_length={max_seq_length} \
+              --do_train=True \
+              --do_predict=True \
+              --train_batch_size={batch_size} \
+              --predict_batch_size=32 \
+              --learning_rate={lr} \
+              --num_train_epochs={epoch} \
+              --save_checkpoints_steps=100000 \
+              --n_best_size=20 \
+              --use_tpu=True \
               --tpu_name={TPU_NAMES[tpu_id - 1]}
             """
     os.system(xargs)
