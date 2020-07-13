@@ -17,7 +17,8 @@ def run_a_model(tpu_id, model_type, batch_size=32, max_seq_length=384, lr=2e-5, 
     predict_feature_left_file = f"gs://squad_cx/albert_data/features/predict_features_left_{max_seq_length}_128_64"
     init_checkpoint = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/model.ckpt-best"
     spm_model_file = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/30k-clean.model"
-    xargs = f"gsutil cp {spm_model_file} ./"
+    spm_vocab = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/30k-clean.vocab"
+    xargs = f"gsutil cp {spm_model_file} {spm_vocab} ./"
     os.system(xargs)
 
     xargs = f"""
