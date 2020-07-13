@@ -17,6 +17,7 @@ def run_a_model(tpu_id, model_type, batch_size=32, max_seq_length=384, lr=2e-5, 
     predict_feature_left_file = f"gs://squad_cx/albert_data/features/predict_features_left_{max_seq_length}_128_64"
     init_checkpoint = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/model.ckpt-best"
     spm_model_file = f"gs://squad_cx/albert_data/pretrain_models/{model_type}/30k-clean.model"
+    xargs = f"gsutil cp {spm_model_file} ./"
 
     xargs = f"""
             python3 run_squad_v2.py \
@@ -28,7 +29,7 @@ def run_a_model(tpu_id, model_type, batch_size=32, max_seq_length=384, lr=2e-5, 
               --predict_feature_file={predict_feature_file} \
               --predict_feature_left_file={predict_feature_left_file} \
               --init_checkpoint={init_checkpoint} \
-              --spm_model_file={spm_model_file} \
+              --spm_model_file=30k-clean.model \
               --max_seq_length={max_seq_length} \
               --do_train=True \
               --do_predict=True \
