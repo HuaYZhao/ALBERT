@@ -2,15 +2,15 @@ import json
 from copy import deepcopy
 import os
 from matplotlib import pyplot as plt
-from data.eval import get_raw_scores, normalize_answer
+from data.eval import get_raw_scores, normalize_answer, compute_f1
 import numpy as np
 import time
 from functional import seq
 
-prediction_file = './data/predictions.json'
+prediction_file = './data/squad_preds.json'
 prediction = json.load(open(prediction_file, 'r', encoding='utf-8'))
 
-null_odds_file = './data/null_odds.json'
+null_odds_file = './data/squad_null_odds.json'
 null_odds = json.load(open(null_odds_file, 'r', encoding='utf-8'))
 
 nbest_predictions_file = './data/nbest_predictions.json'
@@ -167,6 +167,56 @@ def check_data():
                                  **x))
              .filter(lambda x: x['answers'])
              ).list()
+
+    error_answer = (seq(all_qas)
+                    .filter(lambda x: dev_f1_scores[x['id']] != 0)
+                    .filter(lambda x: null_odds[x['id']] > -2.7)
+                    .map(lambda x: dict(prediction=prediction[x['id']],
+                                        **x,
+                                        null_odd=null_odds[x['id']]))
+                    .filter(lambda x: x['answers'])
+                    ).list()
+
+    true_answer = (seq(all_qas)
+                   .filter(lambda x: null_odds[x['id']] > -2.7)
+                   .map(lambda x: dict(prediction=prediction[x['id']],
+                                       **x,
+                                       null_odd=null_odds[x['id']]))
+                   .filter(lambda x: not x['answers'])
+                   ).list()
+    print(1)
+
+
+def check_reg_perform():
+    answer_model_preds = json.load(open('./analyze_model/squad_preds.json'))
+    reg_model_preds = json.load(open('./analyze_model/predictions.json'))
+    all_qas = []
+    for article in dev:
+        for paragraph in article["paragraphs"]:
+            context = paragraph['context']
+            for qa in paragraph['qas']:
+                qa['context'] = context
+                _id = qa['id']
+                qa['answer_model'] = answer_model_preds[_id]
+                qa['answer_f1'] = max(compute_f1(g['text'], qa['answer_model']) for g in qa['answers']) if qa[
+                    'answers'] else 0
+                qa['reg_model'] = reg_model_preds[_id]
+                qa['reg_f1'] = max(compute_f1(g['text'], qa['reg_model']) for g in qa['answers']) if qa[
+                    'answers'] else 0
+                all_qas.append(qa)
+
+    xargs = "python ./data/eval.py ./data/dev-v2.0.json ./analyze_model/predictions.json"
+    os.system(xargs)
+    for _id, v in reg_model_preds.items():
+        if not v:
+            answer_model_preds[_id] = ""
+    json.dump(answer_model_preds, open('./analyze_model/tmp_preds.json', 'w', encoding='utf-8'))
+    xargs = "python ./data/eval.py ./data/dev-v2.0.json ./analyze_model/tmp_preds.json"
+    os.system(xargs)
+    compare = (seq(all_qas)
+               .filter(lambda x: x['reg_model'])
+               .filter(lambda x: x['reg_f1'] > x['answer_f1'])
+               ).list()
     print(1)
 
 
@@ -213,3 +263,4 @@ def write_answer_refine():
 # os.system(xargs)
 # print(f"cost time: {time.time() - start}")
 check_data()
+# check_reg_perform()
