@@ -1025,6 +1025,9 @@ def write_predictions_v1(result_dict, all_examples, all_features,
 
     with tf.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
+    import pickle
+    with tf.io.gfile.GFile(output_nbest_file, "wb") as f:
+        pickle.dump(all_nbest_json, f, -1)
 
     return all_predictions
 
