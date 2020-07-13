@@ -1025,9 +1025,6 @@ def write_predictions_v1(result_dict, all_examples, all_features,
 
     with tf.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
-    import pickle
-    with tf.io.gfile.GFile(output_nbest_file, "wb") as f:
-        pickle.dump(all_nbest_json, f, -1)
 
     return all_predictions
 
@@ -1440,6 +1437,10 @@ def write_predictions_v2(result_dict, cls_dict, all_examples, all_features,
 
     with tf.gfile.GFile(output_nbest_file, "w") as writer:
         writer.write(json.dumps(all_nbest_json, indent=4) + "\n")
+    import pickle
+    import os
+    with tf.io.gfile.GFile(os.path.join(os.path.dirname(output_nbest_file), 'eval_all_nbest.pkl'), "wb") as f:
+        pickle.dump(all_nbest_json, f, -1)
 
     with tf.gfile.GFile(output_null_log_odds_file, "w") as writer:
         writer.write(json.dumps(scores_diff_json, indent=4) + "\n")
